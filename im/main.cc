@@ -53,7 +53,7 @@ class t_context : public t_engine
 	{
 		return v_xkb_state;
 	}
-	void f_update_preedit_text();
+	void f_send_preedit();
 	void f_process(xkb_keysym_t a_key, char a_ascii);
 
 protected:
@@ -61,8 +61,28 @@ protected:
 	{
 		v_forwarded = true;
 	}
-	virtual void f_on_compose(size_t a_i, size_t a_m, const wchar_t* a_cs, const t_attribute* a_as, size_t a_n);
-	virtual void f_on_commit(const wchar_t* a_cs, size_t a_n);
+	virtual void f_on_compose(size_t a_i, size_t a_m, const wchar_t* a_cs, const t_attribute* a_as, size_t a_n)
+	{
+		{
+			auto i = v_cs.begin() + a_i;
+			v_cs.insert(v_cs.erase(i, i + a_m), a_cs, a_cs + a_n);
+		}
+		{
+			auto i = v_as.begin() + a_i;
+			v_as.insert(v_as.erase(i, i + a_m), a_as, a_as + a_n);
+		}
+		f_send_preedit();
+	}
+	virtual void f_on_commit(const wchar_t* a_cs, size_t a_n)
+	{
+		v_cs.clear();
+		v_as.clear();
+		std::vector<char> cs;
+		v_converter(a_cs, a_cs + a_n, std::back_inserter(cs));
+		cs.push_back('\0');
+		zwp_input_method_v2_commit_string(v_input, cs.data());
+		zwp_input_method_v2_commit(v_input, v_serial);
+	}
 	virtual void f_on_status()
 	{
 		v_surface.f_request_frame();
@@ -81,6 +101,9 @@ public:
 	{
 		v_input = zwp_input_method_manager_v2_get_input_method(a_manager, f_client());
 		zwp_input_method_v2_add_listener(v_input, &v_zwp_input_method_v2_listener, this);
+		auto region = wl_compositor_create_region(f_client());
+		wl_surface_set_input_region(v_surface, region);
+		wl_region_destroy(region);
 		v_popup = zwp_input_method_v2_get_input_popup_surface(v_input, v_surface);
 		int size = std::ceil(v_font.getMetrics(&v_metrics));
 		v_surface.f_create(size, size);
@@ -180,7 +203,7 @@ zwp_input_method_v2_listener t_context::v_zwp_input_method_v2_listener = {
 			if (self.v_active) {
 				self.v_grab = zwp_input_method_v2_grab_keyboard(self.v_input);
 				zwp_input_method_keyboard_grab_v2_add_listener(self.v_grab, &v_zwp_input_method_keyboard_grab_v2_listener, &self);
-				if (!self.v_cs.empty()) self.f_update_preedit_text();
+				if (!self.v_cs.empty()) self.f_send_preedit();
 				self.v_surface.v_on_frame(0);
 			} else {
 				if (self.v_repeat) {
@@ -254,7 +277,7 @@ zwp_input_method_keyboard_grab_v2_listener t_context::v_zwp_input_method_keyboar
 	}
 };
 
-void t_context::f_update_preedit_text()
+void t_context::f_send_preedit()
 {
 	std::vector<char> cs;
 	size_t begin;
@@ -288,30 +311,6 @@ void t_context::f_process(xkb_keysym_t a_key, char a_ascii)
 	if (!v_forwarded) return;
 	char cs[] = {a_ascii, '\0'};
 	zwp_input_method_v2_commit_string(v_input, cs);
-	zwp_input_method_v2_commit(v_input, v_serial);
-}
-
-void t_context::f_on_compose(size_t a_i, size_t a_m, const wchar_t* a_cs, const t_attribute* a_as, size_t a_n)
-{
-	{
-		auto i = v_cs.begin() + a_i;
-		v_cs.insert(v_cs.erase(i, i + a_m), a_cs, a_cs + a_n);
-	}
-	{
-		auto i = v_as.begin() + a_i;
-		v_as.insert(v_as.erase(i, i + a_m), a_as, a_as + a_n);
-	}
-	f_update_preedit_text();
-}
-
-void t_context::f_on_commit(const wchar_t* a_cs, size_t a_n)
-{
-	v_cs.clear();
-	v_as.clear();
-	std::vector<char> cs;
-	v_converter(a_cs, a_cs + a_n, std::back_inserter(cs));
-	cs.push_back('\0');
-	zwp_input_method_v2_commit_string(v_input, cs.data());
 	zwp_input_method_v2_commit(v_input, v_serial);
 }
 
