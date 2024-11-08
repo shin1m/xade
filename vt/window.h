@@ -20,14 +20,14 @@ class t_window
 
 	enum t_part
 	{
-		e_part__NONE,
-		e_part__CONTENT,
-		e_part__BUTTON_UP,
-		e_part__BUTTON_DOWN,
-		e_part__GAP_UP,
-		e_part__GAP_DOWN,
-		e_part__THUMB,
-		e_part__OTHER
+		c_part__NONE,
+		c_part__CONTENT,
+		c_part__BUTTON_UP,
+		c_part__BUTTON_DOWN,
+		c_part__GAP_UP,
+		c_part__GAP_DOWN,
+		c_part__THUMB,
+		c_part__OTHER
 	};
 
 	static t_code f_code(xkb_keysym_t a_key);
@@ -65,8 +65,8 @@ class t_window
 	SkRegion v_valid;
 	bool v_bar_valid = false;
 	std::function<void()> v_on_hover;
-	t_part v_hovered = e_part__NONE;
-	t_part v_pressed = e_part__NONE;
+	t_part v_hovered = c_part__NONE;
+	t_part v_pressed = c_part__NONE;
 	const t_cursor* v_cursor_content = nullptr;
 	std::shared_ptr<suisha::t_timer> v_repeat;
 

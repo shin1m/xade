@@ -10,151 +10,151 @@ t_window::t_code t_window::f_code(xkb_keysym_t a_key)
 {
 	switch (a_key) {
 	case XKB_KEY_BackSpace:
-		return t_code::e_BACK_SPACE;
+		return t_code::c_BACK_SPACE;
 	case XKB_KEY_Tab:
-		return t_code::e_TAB;
+		return t_code::c_TAB;
 	case XKB_KEY_F1:
-		return t_code::e_F1;
+		return t_code::c_F1;
 	case XKB_KEY_F2:
-		return t_code::e_F2;
+		return t_code::c_F2;
 	case XKB_KEY_F3:
-		return t_code::e_F3;
+		return t_code::c_F3;
 	case XKB_KEY_F4:
-		return t_code::e_F4;
+		return t_code::c_F4;
 	case XKB_KEY_F5:
-		return t_code::e_F5;
+		return t_code::c_F5;
 	case XKB_KEY_F6:
-		return t_code::e_F6;
+		return t_code::c_F6;
 	case XKB_KEY_F7:
-		return t_code::e_F7;
+		return t_code::c_F7;
 	case XKB_KEY_F8:
-		return t_code::e_F8;
+		return t_code::c_F8;
 	case XKB_KEY_F9:
-		return t_code::e_F9;
+		return t_code::c_F9;
 	case XKB_KEY_F10:
-		return t_code::e_F10;
+		return t_code::c_F10;
 	case XKB_KEY_F11:
-		return t_code::e_F11;
+		return t_code::c_F11;
 	case XKB_KEY_F12:
-		return t_code::e_F12;
+		return t_code::c_F12;
 	case XKB_KEY_F13:
-		return t_code::e_F13;
+		return t_code::c_F13;
 	case XKB_KEY_F14:
-		return t_code::e_F14;
+		return t_code::c_F14;
 	case XKB_KEY_F15:
-		return t_code::e_F15;
+		return t_code::c_F15;
 	case XKB_KEY_F16:
-		return t_code::e_F16;
+		return t_code::c_F16;
 	case XKB_KEY_F17:
-		return t_code::e_F17;
+		return t_code::c_F17;
 	case XKB_KEY_F18:
-		return t_code::e_F18;
+		return t_code::c_F18;
 	case XKB_KEY_F19:
-		return t_code::e_F19;
+		return t_code::c_F19;
 	case XKB_KEY_F20:
-		return t_code::e_F20;
+		return t_code::c_F20;
 	case XKB_KEY_F21:
-		return t_code::e_F21;
+		return t_code::c_F21;
 	case XKB_KEY_F22:
-		return t_code::e_F22;
+		return t_code::c_F22;
 	case XKB_KEY_F23:
-		return t_code::e_F23;
+		return t_code::c_F23;
 	case XKB_KEY_F24:
-		return t_code::e_F24;
+		return t_code::c_F24;
 	case XKB_KEY_Delete:
-		return t_code::e_DELETE;
+		return t_code::c_DELETE;
 	case XKB_KEY_Home:
-		return t_code::e_HOME;
+		return t_code::c_HOME;
 	case XKB_KEY_Left:
-		return t_code::e_LEFT;
+		return t_code::c_LEFT;
 	case XKB_KEY_Up:
-		return t_code::e_UP;
+		return t_code::c_UP;
 	case XKB_KEY_Right:
-		return t_code::e_RIGHT;
+		return t_code::c_RIGHT;
 	case XKB_KEY_Down:
-		return t_code::e_DOWN;
+		return t_code::c_DOWN;
 	case XKB_KEY_Page_Up:
-		return t_code::e_PRIOR;
+		return t_code::c_PRIOR;
 	case XKB_KEY_Page_Down:
-		return t_code::e_NEXT;
+		return t_code::c_NEXT;
 	case XKB_KEY_End:
-		return t_code::e_END;
+		return t_code::c_END;
 	case XKB_KEY_Begin:
-		return t_code::e_BEGIN;
+		return t_code::c_BEGIN;
 	case XKB_KEY_Insert:
-		return t_code::e_INSERT;
+		return t_code::c_INSERT;
 	case XKB_KEY_KP_Space:
-		return t_code::e_KP_SPACE;
+		return t_code::c_KP_SPACE;
 	case XKB_KEY_KP_Tab:
-		return t_code::e_KP_TAB;
+		return t_code::c_KP_TAB;
 	case XKB_KEY_KP_Enter:
-		return t_code::e_KP_ENTER;
+		return t_code::c_KP_ENTER;
 	case XKB_KEY_KP_F1:
-		return t_code::e_KP_F1;
+		return t_code::c_KP_F1;
 	case XKB_KEY_KP_F2:
-		return t_code::e_KP_F2;
+		return t_code::c_KP_F2;
 	case XKB_KEY_KP_F3:
-		return t_code::e_KP_F3;
+		return t_code::c_KP_F3;
 	case XKB_KEY_KP_F4:
-		return t_code::e_KP_F4;
+		return t_code::c_KP_F4;
 	case XKB_KEY_KP_Home:
-		return t_code::e_KP_HOME;
+		return t_code::c_KP_HOME;
 	case XKB_KEY_KP_Left:
-		return t_code::e_KP_LEFT;
+		return t_code::c_KP_LEFT;
 	case XKB_KEY_KP_Up:
-		return t_code::e_KP_UP;
+		return t_code::c_KP_UP;
 	case XKB_KEY_KP_Right:
-		return t_code::e_KP_RIGHT;
+		return t_code::c_KP_RIGHT;
 	case XKB_KEY_KP_Down:
-		return t_code::e_KP_DOWN;
+		return t_code::c_KP_DOWN;
 	case XKB_KEY_KP_Prior:
-		return t_code::e_KP_PRIOR;
+		return t_code::c_KP_PRIOR;
 	case XKB_KEY_KP_Next:
-		return t_code::e_KP_NEXT;
+		return t_code::c_KP_NEXT;
 	case XKB_KEY_KP_End:
-		return t_code::e_KP_END;
+		return t_code::c_KP_END;
 	case XKB_KEY_KP_Begin:
-		return t_code::e_KP_BEGIN;
+		return t_code::c_KP_BEGIN;
 	case XKB_KEY_KP_Insert:
-		return t_code::e_KP_INSERT;
+		return t_code::c_KP_INSERT;
 	case XKB_KEY_KP_Delete:
-		return t_code::e_KP_DELETE;
+		return t_code::c_KP_DELETE;
 	case XKB_KEY_KP_Equal:
-		return t_code::e_KP_EQUAL;
+		return t_code::c_KP_EQUAL;
 	case XKB_KEY_KP_Multiply:
-		return t_code::e_KP_MULTIPLY;
+		return t_code::c_KP_MULTIPLY;
 	case XKB_KEY_KP_Add:
-		return t_code::e_KP_ADD;
+		return t_code::c_KP_ADD;
 	case XKB_KEY_KP_Separator:
-		return t_code::e_KP_SEPARATOR;
+		return t_code::c_KP_SEPARATOR;
 	case XKB_KEY_KP_Subtract:
-		return t_code::e_KP_SUBTRACT;
+		return t_code::c_KP_SUBTRACT;
 	case XKB_KEY_KP_Decimal:
-		return t_code::e_KP_DECIMAL;
+		return t_code::c_KP_DECIMAL;
 	case XKB_KEY_KP_Divide:
-		return t_code::e_KP_DIVIDE;
+		return t_code::c_KP_DIVIDE;
 	case XKB_KEY_KP_0:
-		return t_code::e_KP_0;
+		return t_code::c_KP_0;
 	case XKB_KEY_KP_1:
-		return t_code::e_KP_1;
+		return t_code::c_KP_1;
 	case XKB_KEY_KP_2:
-		return t_code::e_KP_2;
+		return t_code::c_KP_2;
 	case XKB_KEY_KP_3:
-		return t_code::e_KP_3;
+		return t_code::c_KP_3;
 	case XKB_KEY_KP_4:
-		return t_code::e_KP_4;
+		return t_code::c_KP_4;
 	case XKB_KEY_KP_5:
-		return t_code::e_KP_5;
+		return t_code::c_KP_5;
 	case XKB_KEY_KP_6:
-		return t_code::e_KP_6;
+		return t_code::c_KP_6;
 	case XKB_KEY_KP_7:
-		return t_code::e_KP_7;
+		return t_code::c_KP_7;
 	case XKB_KEY_KP_8:
-		return t_code::e_KP_8;
+		return t_code::c_KP_8;
 	case XKB_KEY_KP_9:
-		return t_code::e_KP_9;
+		return t_code::c_KP_9;
 	default:
-		return t_code::e_NONE;
+		return t_code::c_NONE;
 	}
 }
 
@@ -308,10 +308,10 @@ void t_window::f_draw_bar(SkCanvas& a_canvas)
 	auto draw = [&](auto a_part, auto a_y)
 	{
 		auto hovered = a_part == v_hovered ? 1 : 0;
-		v_decoration.v_theme.f_draw(a_canvas, v_bar_glyphs[a_part - e_part__BUTTON_UP], x, a_y, v_pressed != e_part__NONE ? a_part == v_pressed ? hovered + 1 : 0 : hovered);
+		v_decoration.v_theme.f_draw(a_canvas, v_bar_glyphs[a_part - c_part__BUTTON_UP], x, a_y, v_pressed != c_part__NONE ? a_part == v_pressed ? hovered + 1 : 0 : hovered);
 	};
-	draw(e_part__BUTTON_UP, 0);
-	draw(e_part__BUTTON_DOWN, v_height - bh);
+	draw(c_part__BUTTON_UP, 0);
+	draw(c_part__BUTTON_DOWN, v_height - bh);
 }
 
 void t_window::f__scroll(int a_y, unsigned a_height, int a_dy)
@@ -603,10 +603,10 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	};
 	v_frame.v_on_key_press = v_frame.v_on_key_repeat = [&](auto a_key, auto a_c)
 	{
-		if (v_pressed == e_part__NONE && v_hovered == e_part__CONTENT) f_client().f_cursor__(v_cursor_content = nullptr);
+		if (v_pressed == c_part__NONE && v_hovered == c_part__CONTENT) f_client().f_cursor__(v_cursor_content = nullptr);
 		f_position__(INT_MAX);
 		auto code = f_code(a_key);
-		if (code != t_code::e_NONE) {
+		if (code != t_code::c_NONE) {
 			size_t i = 0;
 			if (xkb_state_mod_name_is_active(f_client(), XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) i |= 1;
 			if (xkb_state_mod_name_is_active(f_client(), XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) i |= 2;
@@ -730,37 +730,37 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	{
 		auto frame = v_decoration.v_theme.f_frame(v_frame);
 		auto y = f_client().f_pointer_y() - frame.fTop;
-		if (y < 0.0) return hovered(e_part__NONE);
+		if (y < 0.0) return hovered(c_part__NONE);
 		auto x = f_client().f_pointer_x() - frame.fLeft;
-		if (x < v_width) return hovered(x >= 0.0 && y < v_height ? e_part__CONTENT : e_part__NONE);
-		if (x >= v_width + v_decoration.v_theme.v_unit.fWidth) return hovered(e_part__NONE);
+		if (x < v_width) return hovered(x >= 0.0 && y < v_height ? c_part__CONTENT : c_part__NONE);
+		if (x >= v_width + v_decoration.v_theme.v_unit.fWidth) return hovered(c_part__NONE);
 		auto content = f_content();
-		if (content <= v_height) return hovered(e_part__OTHER);
+		if (content <= v_height) return hovered(c_part__OTHER);
 		auto bh = v_decoration.v_theme.v_unit.fHeight;
-		if (v_height < bh * 2) return hovered(y < v_height / 2 ? e_part__BUTTON_UP : e_part__BUTTON_DOWN);
-		if (y < bh) return hovered(e_part__BUTTON_UP);
+		if (v_height < bh * 2) return hovered(y < v_height / 2 ? c_part__BUTTON_UP : c_part__BUTTON_DOWN);
+		if (y < bh) return hovered(c_part__BUTTON_UP);
 		int gap_end = v_height - bh;
 		int gap = gap_end - bh;
 		if (gap > bh) {
 			unsigned thumb = static_cast<double>(gap) * v_height / content;
 			if (thumb < bh) thumb = bh;
 			int thumb_begin = bh + static_cast<int>(static_cast<double>(gap - thumb) * v_position / (content - v_height));
-			if (y < thumb_begin) return hovered(e_part__GAP_UP);
-			if (y < thumb_begin + thumb) return hovered(e_part__THUMB);
-			if (y < gap_end) return hovered(e_part__GAP_DOWN);
+			if (y < thumb_begin) return hovered(c_part__GAP_UP);
+			if (y < thumb_begin + thumb) return hovered(c_part__THUMB);
+			if (y < gap_end) return hovered(c_part__GAP_DOWN);
 		} else {
-			if (y < gap_end) return hovered(e_part__OTHER);
+			if (y < gap_end) return hovered(c_part__OTHER);
 		}
-		hovered(y < v_height ? e_part__BUTTON_DOWN : e_part__NONE);
+		hovered(y < v_height ? c_part__BUTTON_DOWN : c_part__NONE);
 	};
 	auto hover_cursor = [&, hover]
 	{
 		hover();
-		f_client().f_cursor__(v_hovered == e_part__CONTENT ? v_cursor_content : &v_decoration.v_theme.v_cursor_arrow);
+		f_client().f_cursor__(v_hovered == c_part__CONTENT ? v_cursor_content : &v_decoration.v_theme.v_cursor_arrow);
 	};
 	v_on_hover = [&, hover_cursor]
 	{
-		if (v_hovered != e_part__NONE) hover_cursor();
+		if (v_hovered != c_part__NONE) hover_cursor();
 	};
 	v_frame.v_on_pointer_enter = v_frame.v_on_pointer_move = [&, hover_cursor]
 	{
@@ -769,17 +769,17 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	};
 	v_frame.v_on_pointer_leave = [&, hovered]
 	{
-		hovered(e_part__NONE);
+		hovered(c_part__NONE);
 	};
 	v_frame.v_on_button_press = [&, hover](auto a_button)
 	{
-		if (v_hovered == e_part__NONE) return;
+		if (v_hovered == c_part__NONE) return;
 		v_pressed = v_hovered;
 		v_bar_valid = false;
 		v_frame.f_request_frame();
 		auto release = [&, hover = v_on_hover, move = v_frame.v_on_pointer_move](auto a_button)
 		{
-			v_pressed = e_part__NONE;
+			v_pressed = c_part__NONE;
 			v_bar_valid = false;
 			v_frame.f_request_frame();
 			v_on_hover = hover;
@@ -790,19 +790,19 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		v_on_hover = v_frame.v_on_pointer_move = hover;
 		int delta;
 		switch (v_hovered) {
-		case e_part__BUTTON_UP:
+		case c_part__BUTTON_UP:
 			delta = -v_unit.fHeight;
 			break;
-		case e_part__GAP_UP:
+		case c_part__GAP_UP:
 			delta = -v_height;
 			break;
-		case e_part__GAP_DOWN:
+		case c_part__GAP_DOWN:
 			delta = v_height;
 			break;
-		case e_part__BUTTON_DOWN:
+		case c_part__BUTTON_DOWN:
 			delta = v_unit.fHeight;
 			break;
-		case e_part__THUMB:
+		case c_part__THUMB:
 			{
 				auto w2v = [&]
 				{

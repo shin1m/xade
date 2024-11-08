@@ -46,25 +46,25 @@ class t_decoration
 {
 	enum t_part
 	{
-		e_part__LEFT_TOP,
-		e_part__TOP,
-		e_part__RIGHT_TOP,
-		e_part__LEFT,
-		e_part__BAR,
-		e_part__RIGHT,
-		e_part__LEFT_BOTTOM,
-		e_part__BOTTOM,
-		e_part__RIGHT_BOTTOM,
-		e_part__MENU,
-		e_part__MINIMIZE,
-		e_part__MAXIMIZE,
-		e_part__FULLSCREEN,
-		e_part__CLOSE,
-		e_part__CONTENT
+		c_part__LEFT_TOP,
+		c_part__TOP,
+		c_part__RIGHT_TOP,
+		c_part__LEFT,
+		c_part__BAR,
+		c_part__RIGHT,
+		c_part__LEFT_BOTTOM,
+		c_part__BOTTOM,
+		c_part__RIGHT_BOTTOM,
+		c_part__MENU,
+		c_part__MINIMIZE,
+		c_part__MAXIMIZE,
+		c_part__FULLSCREEN,
+		c_part__CLOSE,
+		c_part__CONTENT
 	};
 
-	t_part v_hovered = e_part__CONTENT;
-	t_part v_pressed = e_part__CONTENT;
+	t_part v_hovered = c_part__CONTENT;
+	t_part v_pressed = c_part__CONTENT;
 	bool v_valid = false;
 
 	t_part f_part(t_frame& a_frame) const;

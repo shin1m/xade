@@ -44,17 +44,17 @@ t_decoration::t_part t_decoration::f_part(t_frame& a_frame) const
 	auto x = f_client().f_pointer_x();
 	auto y = f_client().f_pointer_y();
 	if (x >= b && x < width - b && y >= b && y < height - b) {
-		if (y >= c) return e_part__CONTENT;
-		if (x < b + v_theme.v_unit.fWidth) return e_part__MENU;
+		if (y >= c) return c_part__CONTENT;
+		if (x < b + v_theme.v_unit.fWidth) return c_part__MENU;
 		auto bx = width - b - v_theme.v_unit.fWidth;
-		if (x >= bx) return e_part__CLOSE;
+		if (x >= bx) return c_part__CLOSE;
 		bx -= v_theme.v_unit.fWidth;
-		if (x >= bx) return e_part__FULLSCREEN;
+		if (x >= bx) return c_part__FULLSCREEN;
 		bx -= v_theme.v_unit.fWidth;
-		if (x >= bx) return e_part__MAXIMIZE;
+		if (x >= bx) return c_part__MAXIMIZE;
 		bx -= v_theme.v_unit.fWidth;
-		if (x >= bx) return e_part__MINIMIZE;
-		return e_part__BAR;
+		if (x >= bx) return c_part__MINIMIZE;
+		return c_part__BAR;
 	}
 	auto part = [&](auto a_size, auto a_value)
 	{
@@ -80,14 +80,14 @@ void t_decoration::f_draw(t_frame& a_frame, SkCanvas& a_canvas, size_t a_width, 
 	auto draw = [&](auto a_part, int32_t a_x, int32_t a_y)
 	{
 		auto hovered = a_part == v_hovered ? 1 : 0;
-		v_theme.f_draw(a_canvas, v_theme.f_glyphs()[a_part - e_part__MENU], a_x, a_y, v_pressed < e_part__CONTENT ? a_part == v_pressed ? hovered + 1 : 0 : hovered);
+		v_theme.f_draw(a_canvas, v_theme.f_glyphs()[a_part - c_part__MENU], a_x, a_y, v_pressed < c_part__CONTENT ? a_part == v_pressed ? hovered + 1 : 0 : hovered);
 	};
-	draw(e_part__MENU, b, b);
+	draw(c_part__MENU, b, b);
 	auto x = a_width - b - v_theme.v_unit.fWidth;
-	draw(e_part__CLOSE, x, b);
-	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN)) draw(e_part__FULLSCREEN, x -= v_theme.v_unit.fWidth, b);
-	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE)) draw(e_part__MAXIMIZE, x -= v_theme.v_unit.fWidth, b);
-	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE)) draw(e_part__MINIMIZE, x -= v_theme.v_unit.fWidth, b);
+	draw(c_part__CLOSE, x, b);
+	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN)) draw(c_part__FULLSCREEN, x -= v_theme.v_unit.fWidth, b);
+	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE)) draw(c_part__MAXIMIZE, x -= v_theme.v_unit.fWidth, b);
+	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE)) draw(c_part__MINIMIZE, x -= v_theme.v_unit.fWidth, b);
 }
 
 void t_decoration::f_hook(t_frame& a_frame)
@@ -103,8 +103,8 @@ void t_decoration::f_hook(t_frame& a_frame)
 	{
 		auto part = f_part(a_frame);
 		hovered(part);
-		if (part >= e_part__CONTENT) return false;
-		f_client().f_cursor__(part < e_part__MENU ? &v_theme.v_part_cursors[part] : &v_theme.v_cursor_arrow);
+		if (part >= c_part__CONTENT) return false;
+		f_client().f_cursor__(part < c_part__MENU ? &v_theme.v_part_cursors[part] : &v_theme.v_cursor_arrow);
 		return true;
 	};
 	auto enter = a_frame.v_on_pointer_enter;
@@ -115,8 +115,8 @@ void t_decoration::f_hook(t_frame& a_frame)
 	auto leave = a_frame.v_on_pointer_leave;
 	a_frame.v_on_pointer_leave = [&, hovered, leave]
 	{
-		if (v_hovered < e_part__CONTENT)
-			hovered(e_part__CONTENT);
+		if (v_hovered < c_part__CONTENT)
+			hovered(c_part__CONTENT);
 		else
 			leave();
 	};
@@ -124,9 +124,9 @@ void t_decoration::f_hook(t_frame& a_frame)
 	{
 		auto hovered = v_hovered;
 		if (hover()) {
-			if (hovered >= e_part__CONTENT) leave();
+			if (hovered >= c_part__CONTENT) leave();
 		} else {
-			if (hovered < e_part__CONTENT)
+			if (hovered < c_part__CONTENT)
 				enter();
 			else
 				move();
@@ -134,30 +134,30 @@ void t_decoration::f_hook(t_frame& a_frame)
 	};
 	a_frame.v_on_button_press = [&, hovered, press = a_frame.v_on_button_press](auto a_button)
 	{
-		if (v_hovered >= e_part__CONTENT) return press(a_button);
-		if (v_hovered < e_part__MENU) {
+		if (v_hovered >= c_part__CONTENT) return press(a_button);
+		if (v_hovered < c_part__MENU) {
 			uint32_t edges = XDG_TOPLEVEL_RESIZE_EDGE_NONE;
 			switch (v_hovered) {
-			case e_part__LEFT_TOP:
-			case e_part__TOP:
-			case e_part__RIGHT_TOP:
+			case c_part__LEFT_TOP:
+			case c_part__TOP:
+			case c_part__RIGHT_TOP:
 				edges |= XDG_TOPLEVEL_RESIZE_EDGE_TOP;
 				break;
-			case e_part__LEFT_BOTTOM:
-			case e_part__BOTTOM:
-			case e_part__RIGHT_BOTTOM:
+			case c_part__LEFT_BOTTOM:
+			case c_part__BOTTOM:
+			case c_part__RIGHT_BOTTOM:
 				edges |= XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM;
 				break;
 			}
 			switch (v_hovered) {
-			case e_part__LEFT_TOP:
-			case e_part__LEFT:
-			case e_part__LEFT_BOTTOM:
+			case c_part__LEFT_TOP:
+			case c_part__LEFT:
+			case c_part__LEFT_BOTTOM:
 				edges |= XDG_TOPLEVEL_RESIZE_EDGE_LEFT;
 				break;
-			case e_part__RIGHT_TOP:
-			case e_part__RIGHT:
-			case e_part__RIGHT_BOTTOM:
+			case c_part__RIGHT_TOP:
+			case c_part__RIGHT:
+			case c_part__RIGHT_BOTTOM:
 				edges |= XDG_TOPLEVEL_RESIZE_EDGE_RIGHT;
 				break;
 			}
@@ -173,32 +173,32 @@ void t_decoration::f_hook(t_frame& a_frame)
 		a_frame.v_on_button_release = [&, move = a_frame.v_on_pointer_move, release = a_frame.v_on_button_release](auto)
 		{
 			auto pressed = v_pressed;
-			v_pressed = e_part__CONTENT;
+			v_pressed = c_part__CONTENT;
 			v_valid = false;
 			a_frame.f_request_frame();
 			if (v_hovered == pressed) switch (v_hovered) {
-			case e_part__MENU:
+			case c_part__MENU:
 				{
 					auto [b, c] = v_theme.f_border(a_frame);
 					a_frame.f_show_window_menu(b, c);
 				}
 				break;
-			case e_part__MINIMIZE:
+			case c_part__MINIMIZE:
 				xdg_toplevel_set_minimized(a_frame);
 				break;
-			case e_part__MAXIMIZE:
+			case c_part__MAXIMIZE:
 				if (a_frame.f_is(XDG_TOPLEVEL_STATE_MAXIMIZED))
 					xdg_toplevel_unset_maximized(a_frame);
 				else
 					xdg_toplevel_set_maximized(a_frame);
 				break;
-			case e_part__FULLSCREEN:
+			case c_part__FULLSCREEN:
 				if (a_frame.f_is(XDG_TOPLEVEL_STATE_FULLSCREEN))
 					xdg_toplevel_unset_fullscreen(a_frame);
 				else
 					xdg_toplevel_set_fullscreen(a_frame, NULL);
 				break;
-			case e_part__CLOSE:
+			case c_part__CLOSE:
 				if (auto& on = a_frame.v_on_close) on();
 				break;
 			}

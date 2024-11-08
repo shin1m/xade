@@ -46,7 +46,7 @@ void t_engine::f_roman_push(wchar_t a_c, const t_map* a_map)
 	if (state.v_okuri > 0) --i;
 	v_buffer.push_back(a_c);
 	v_map = a_map;
-	auto a = e_attribute__ROMAN;
+	auto a = c_attribute__ROMAN;
 	f_on_compose(i, 0, &a_c, &a, 1);
 }
 
@@ -60,16 +60,16 @@ void t_engine::f_roman_reduce(const wchar_t* a_cs, size_t a_n)
 	if (v_mode == &t_engine::f_mode_kanji) {
 		if (state.v_okuri > 0) {
 			state.v_okuri += a_n;
-			std::vector as(a_n, e_attribute__OKURI);
+			std::vector as(a_n, c_attribute__OKURI);
 			f_on_compose(--i, n, a_cs, as.data(), a_n);
 		} else {
 			state.v_entry += a_n;
-			std::vector as(a_n, e_attribute__ENTRY);
+			std::vector as(a_n, c_attribute__ENTRY);
 			f_on_compose(i, n, a_cs, as.data(), a_n);
 		}
 	} else if (v_states.size() > 1) {
 		state.v_text += a_n;
-		std::vector as(a_n, e_attribute__TEXT);
+		std::vector as(a_n, c_attribute__TEXT);
 		f_on_compose(i, n, a_cs, as.data(), a_n);
 	} else {
 		state = t_state();
@@ -92,7 +92,7 @@ void t_engine::f_text_push(char a_ascii)
 		size_t i = state.v_text;
 		v_buffer.push_back(c);
 		++state.v_text;
-		auto a = e_attribute__TEXT;
+		auto a = c_attribute__TEXT;
 		f_on_compose(i, 0, &c, &a, 1);
 	} else {
 //		f_on_forward();
@@ -113,8 +113,8 @@ void t_engine::f_text_pop()
 		v_buffer.erase(v_buffer.begin() + state.v_base + state.v_text + state.v_entry, v_buffer.end());
 		state.v_okuri = 0;
 		v_mode = &t_engine::f_mode_kanji;
-		std::vector as(state.v_text, e_attribute__TEXT);
-		as.insert(as.end(), state.v_entry, e_attribute__ENTRY);
+		std::vector as(state.v_text, c_attribute__TEXT);
+		as.insert(as.end(), state.v_entry, c_attribute__ENTRY);
 		f_on_compose(0, 0, &v_buffer[state.v_base], as.data(), as.size());
 		f_on_status();
 	} else {
@@ -142,7 +142,7 @@ void t_engine::f_text_commit()
 		if (v_states.size() > 1) {
 			state.v_text = v_buffer.size() - state.v_base;
 			state.v_entry = state.v_okuri = 0;
-			std::vector as(state.v_text, e_attribute__TEXT);
+			std::vector as(state.v_text, c_attribute__TEXT);
 			f_on_compose(0, text, &v_buffer[state.v_base], as.data(), as.size());
 		} else {
 			state = t_state();
@@ -162,7 +162,7 @@ void t_engine::f_entry_push(char a_ascii)
 	wchar_t c = a_ascii;
 	v_buffer.push_back(c);
 	++state.v_entry;
-	auto a = e_attribute__ENTRY;
+	auto a = c_attribute__ENTRY;
 	f_on_compose(i, 0, &c, &a, 1);
 }
 
@@ -189,7 +189,7 @@ void t_engine::f_entry_commit()
 		size_t n = state.v_entry;
 		state.v_text += n;
 		state.v_entry = state.v_okuri = 0;
-		std::vector as(n, e_attribute__TEXT);
+		std::vector as(n, c_attribute__TEXT);
 		f_on_compose(i, n, &v_buffer[state.v_base + i], as.data(), n);
 	} else {
 		state = t_state();
@@ -216,7 +216,7 @@ void t_engine::f_choose()
 		size_t i = state.v_text;
 		size_t n = state.v_entry;
 		const std::wstring& s = v_candidates[0].v_text;
-		std::vector as(s.size(), e_attribute__CANDIDATE);
+		std::vector as(s.size(), c_attribute__CANDIDATE);
 		f_on_compose(i, n, s.c_str(), as.data(), s.size());
 	}
 	f_on_status();
@@ -368,14 +368,14 @@ void t_engine::f_mode_choose(xkb_keysym_t a_key, char a_ascii)
 		v_buffer.erase(v_buffer.begin() + state.v_base + state.v_text + state.v_entry, v_buffer.end());
 		state.v_okuri = 0;
 		v_candidates.clear();
-		std::vector as(state.v_entry, e_attribute__ENTRY);
+		std::vector as(state.v_entry, c_attribute__ENTRY);
 		f_on_compose(state.v_text, n, &v_buffer[state.v_base + state.v_text], as.data(), as.size());
 		f_on_status();
 		f_on_candidates();
 	} else if (a_ascii == ' ') {
 		if (++v_chosen < v_candidates.size()) {
 			const std::wstring& s = v_candidates[v_chosen].v_text;
-			std::vector as(s.size(), e_attribute__CANDIDATE);
+			std::vector as(s.size(), c_attribute__CANDIDATE);
 			f_on_compose(state.v_text, n, s.c_str(), as.data(), s.size());
 			if (v_choosing) {
 				f_on_choose();
@@ -396,7 +396,7 @@ void t_engine::f_mode_choose(xkb_keysym_t a_key, char a_ascii)
 	} else if (a_ascii == 'x') {
 		--v_chosen;
 		const std::wstring& s = v_candidates[v_chosen].v_text;
-		std::vector as(s.size(), e_attribute__CANDIDATE);
+		std::vector as(s.size(), c_attribute__CANDIDATE);
 		f_on_compose(state.v_text, n, s.c_str(), as.data(), s.size());
 		f_on_choose();
 	} else if (a_key == XKB_KEY_Return || std::isprint(a_ascii)) {
@@ -414,7 +414,7 @@ void t_engine::f_mode_choose(xkb_keysym_t a_key, char a_ascii)
 			size_t i = state.v_text;
 			state.v_text = v_buffer.size() - state.v_base;
 			state.v_entry = state.v_okuri = 0;
-			std::vector as(state.v_text - i, e_attribute__TEXT);
+			std::vector as(state.v_text - i, c_attribute__TEXT);
 			f_on_compose(i, n, &v_buffer[state.v_base + i], as.data(), as.size());
 		} else {
 			state = t_state();

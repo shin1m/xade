@@ -289,11 +289,11 @@ void t_context::f_send_preedit()
 		v_converter(i, v_cs.end(), std::back_inserter(cs));
 		end = cs.size();
 	} else {
-		auto i = std::find(v_as.begin(), v_as.end(), e_attribute__CANDIDATE);
+		auto i = std::find(v_as.begin(), v_as.end(), c_attribute__CANDIDATE);
 		auto j = v_cs.begin() + (i - v_as.begin());
 		v_converter(v_cs.begin(), j, std::back_inserter(cs));
 		begin = cs.size();
-		while (i != v_as.end() && *i == e_attribute__CANDIDATE) ++i;
+		while (i != v_as.end() && *i == c_attribute__CANDIDATE) ++i;
 		auto k = v_cs.begin() + (i - v_as.begin());
 		v_converter(j, k, std::back_inserter(cs));
 		end = cs.size();
