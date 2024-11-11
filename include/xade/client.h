@@ -14,9 +14,67 @@
 namespace xade
 {
 
+using namespace std::chrono_literals;
+
 class t_surface;
 class t_cursor;
 class t_input;
+
+class t_xkb
+{
+	xkb_context* v_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	xkb_state* v_state = NULL;
+	int v_rate = 0;
+	int v_delay;
+	std::shared_ptr<suisha::t_timer> v_timer;
+
+public:
+	~t_xkb()
+	{
+		xkb_state_unref(v_state);
+		xkb_context_unref(v_context);
+	}
+	operator xkb_state*() const
+	{
+		return v_state;
+	}
+	void f_keymap(int a_fd, size_t a_size);
+	void f_repeat(int a_rate, int a_delay)
+	{
+		v_rate = a_rate;
+		v_delay = a_delay;
+	}
+	void f_stop()
+	{
+		if (!v_timer) return;
+		v_timer->f_stop();
+		v_timer = {};
+	}
+	void f_key(uint32_t a_key, uint32_t a_state, auto a_press, auto a_repeat, auto a_release)
+	{
+		if (!v_state) return;
+		a_key += 8;
+		auto sym = xkb_state_key_get_one_sym(v_state, a_key);
+		auto c = xkb_state_key_get_utf32(v_state, a_key);
+		switch (a_state) {
+		case WL_KEYBOARD_KEY_STATE_RELEASED:
+			a_release(sym, c);
+			break;
+		case WL_KEYBOARD_KEY_STATE_PRESSED:
+			if (v_rate > 0 && xkb_keymap_key_repeats(xkb_state_get_keymap(v_state), a_key)) v_timer = suisha::f_loop().f_timer([this, repeat = [a_repeat, sym, c]
+			{
+				a_repeat(sym, c);
+			}]
+			{
+				if (v_rate <= 0) return;
+				repeat();
+				v_timer = suisha::f_loop().f_timer(repeat, std::chrono::ceil<std::chrono::milliseconds>(1000000000ns / v_rate));
+			}, std::chrono::milliseconds(v_delay), true);
+			a_press(sym, c);
+			break;
+		}
+	}
+};
 
 class t_client
 {
@@ -40,11 +98,7 @@ class t_client
 	wl_pointer* v_pointer = NULL;
 	wl_cursor_theme* v_cursor_theme = NULL;
 	wl_keyboard* v_keyboard = NULL;
-	xkb_context* v_xkb = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	xkb_state* v_xkb_state = NULL;
-	int v_repeat_rate = 0;
-	int v_repeat_delay;
-	std::shared_ptr<suisha::t_timer> v_repeat;
+	t_xkb v_xkb;
 	xdg_wm_base* v_xdg_wm_base = NULL;
 	EGLDisplay v_egl_display = EGL_NO_DISPLAY;
 	t_surface* v_pointer_focus = nullptr;
@@ -77,7 +131,7 @@ public:
 	}
 	operator xkb_state*() const
 	{
-		return v_xkb_state;
+		return v_xkb;
 	}
 	operator xdg_wm_base*() const
 	{

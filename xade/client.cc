@@ -5,7 +5,18 @@
 namespace xade
 {
 
-using namespace std::chrono_literals;
+void t_xkb::f_keymap(int a_fd, size_t a_size)
+{
+	auto buffer = mmap(0, a_size, PROT_READ, MAP_PRIVATE, a_fd, 0);
+	if (buffer == MAP_FAILED) throw std::system_error(errno, std::generic_category());
+	auto keymap = xkb_keymap_new_from_buffer(v_context, static_cast<char*>(buffer), a_size, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+	if (!keymap) throw std::runtime_error("xkb_keymap_new_from_buffer");
+	munmap(buffer, a_size);
+	xkb_state_unref(v_state);
+	v_state = xkb_state_new(keymap);
+	xkb_keymap_unref(keymap);
+	if (!v_state) throw std::runtime_error("xkb_state_new");
+}
 
 wl_registry_listener t_client::v_registry_listener = {
 	[](auto a_data, auto a_this, auto a_name, auto a_interface, auto a_version)
@@ -107,18 +118,7 @@ wl_pointer_listener t_client::v_pointer_listener = {
 wl_keyboard_listener t_client::v_keyboard_listener = {
 	[](auto a_data, auto a_this, auto a_format, auto a_fd, auto a_size)
 	{
-		if (a_format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
-			auto buffer = mmap(0, a_size, PROT_READ, MAP_PRIVATE, a_fd, 0);
-			if (buffer == MAP_FAILED) throw std::system_error(errno, std::generic_category());
-			auto& self = *static_cast<t_client*>(a_data);
-			auto keymap = xkb_keymap_new_from_buffer(self.v_xkb, static_cast<char*>(buffer), a_size, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
-			if (!keymap) throw std::runtime_error("xkb_keymap_new_from_buffer");
-			munmap(buffer, a_size);
-			xkb_state_unref(self);
-			self.v_xkb_state = xkb_state_new(keymap);
-			xkb_keymap_unref(keymap);
-			if (!self.v_xkb_state) throw std::runtime_error("xkb_state_new");
-		}
+		if (a_format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) static_cast<t_client*>(a_data)->v_xkb.f_keymap(a_fd, a_size);
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_surface, auto a_keys)
 	{
@@ -136,46 +136,26 @@ wl_keyboard_listener t_client::v_keyboard_listener = {
 	{
 		auto& self = *static_cast<t_client*>(a_data);
 		self.v_action_serial = a_serial;
-		if (self.v_repeat) {
-			self.v_repeat->f_stop();
-			self.v_repeat = {};
-		}
-		if (auto focus = self.v_keyboard_focus) if (self.v_xkb_state) {
-			a_key += 8;
-			auto sym = xkb_state_key_get_one_sym(self, a_key);
-			auto c = xkb_state_key_get_utf32(self, a_key);
-			switch (a_state) {
-			case WL_KEYBOARD_KEY_STATE_RELEASED:
-				if (auto& on = focus->v_on_key_release) on(sym, c);
-				break;
-			case WL_KEYBOARD_KEY_STATE_PRESSED:
-				if (self.v_repeat_rate > 0 && xkb_keymap_key_repeats(xkb_state_get_keymap(self), a_key)) {
-					self.v_repeat = suisha::f_loop().f_timer([&self, sym, c]
-					{
-						auto focus = self.v_keyboard_focus;
-						if (!focus) return;
-						if (auto& on = focus->v_on_key_repeat) on(sym, c);
-						if (self.v_repeat_rate > 0) self.v_repeat = suisha::f_loop().f_timer([&self, sym, c]
-						{
-							if (auto focus = self.v_keyboard_focus) if (auto& on = focus->v_on_key_repeat) on(sym, c);
-						}, std::chrono::ceil<std::chrono::milliseconds>(1000000000ns / self.v_repeat_rate));
-					}, std::chrono::milliseconds(self.v_repeat_delay), true);
-				}
-				if (auto& on = focus->v_on_key_press) on(sym, c);
-				break;
-			}
-		}
+		self.v_xkb.f_stop();
+		if (auto focus = self.v_keyboard_focus) self.v_xkb.f_key(a_key, a_state, [focus](auto sym, auto c)
+		{
+			if (auto& on = focus->v_on_key_press) on(sym, c);
+		}, [&self](auto sym, auto c)
+		{
+			if (auto focus = self.v_keyboard_focus) if (auto& on = focus->v_on_key_repeat) on(sym, c);
+		}, [focus](auto sym, auto c)
+		{
+			if (auto& on = focus->v_on_key_release) on(sym, c);
+		});
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_depressed, auto a_latched, auto a_locked, auto a_group)
 	{
 		auto& self = *static_cast<t_client*>(a_data);
-		if (self.v_xkb_state) xkb_state_update_mask(self, a_depressed, a_latched, a_locked, a_group, a_group, a_group);
+		if (self.v_xkb) xkb_state_update_mask(self, a_depressed, a_latched, a_locked, a_group, a_group, a_group);
 	},
 	[](auto a_data, auto a_this, auto a_rate, auto a_delay)
 	{
-		auto& self = *static_cast<t_client*>(a_data);
-		self.v_repeat_rate = a_rate;
-		self.v_repeat_delay = a_delay;
+		static_cast<t_client*>(a_data)->v_xkb.f_repeat(a_rate, a_delay);
 	}
 };
 xdg_wm_base_listener t_client::v_xdg_wm_base_listener = {
@@ -234,8 +214,6 @@ t_client::~t_client()
 	if (v_text_input_manager) zwp_text_input_manager_v3_destroy(v_text_input_manager);
 	if (v_egl_display != EGL_NO_DISPLAY) eglTerminate(v_egl_display);
 	if (v_xdg_wm_base) xdg_wm_base_destroy(v_xdg_wm_base);
-	xkb_state_unref(v_xkb_state);
-	xkb_context_unref(v_xkb);
 	if (v_cursor_theme) wl_cursor_theme_destroy(v_cursor_theme);
 	if (v_pointer) wl_pointer_release(v_pointer);
 	if (v_keyboard) wl_keyboard_release(v_keyboard);

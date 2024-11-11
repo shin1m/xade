@@ -829,7 +829,6 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			release(a_button);
 		};
 		f_position__(v_position + delta);
-		using namespace std::chrono_literals;
 		v_repeat = suisha::f_loop().f_timer([&, repeat = [&, delta]
 		{
 			if (v_hovered == v_pressed) f_position__(v_position + delta);

@@ -22,8 +22,6 @@
 namespace
 {
 
-using namespace std::chrono_literals;
-
 class t_context : public t_engine
 {
 	static zwp_input_method_v2_listener v_zwp_input_method_v2_listener;
@@ -43,16 +41,8 @@ class t_context : public t_engine
 	sk_sp<GrDirectContext> v_sk_context;
 	sk_sp<SkSurface> v_sk_surface;
 	zwp_input_method_keyboard_grab_v2* v_grab = NULL;
-	xkb_context* v_xkb = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	xkb_state* v_xkb_state = NULL;
-	int v_repeat_rate = 0;
-	int v_repeat_delay;
-	std::shared_ptr<suisha::t_timer> v_repeat;
+	t_xkb v_xkb;
 
-	operator xkb_state*() const
-	{
-		return v_xkb_state;
-	}
 	void f_send_preedit();
 	void f_process(xkb_keysym_t a_key, char a_ascii);
 
@@ -206,10 +196,7 @@ zwp_input_method_v2_listener t_context::v_zwp_input_method_v2_listener = {
 				if (!self.v_cs.empty()) self.f_send_preedit();
 				self.v_surface.v_on_frame(0);
 			} else {
-				if (self.v_repeat) {
-					self.v_repeat->f_stop();
-					self.v_repeat = {};
-				}
+				self.v_xkb.f_stop();
 				zwp_input_method_keyboard_grab_v2_release(self.v_grab);
 				self.v_grab = NULL;
 			}
@@ -223,57 +210,28 @@ zwp_input_method_v2_listener t_context::v_zwp_input_method_v2_listener = {
 zwp_input_method_keyboard_grab_v2_listener t_context::v_zwp_input_method_keyboard_grab_v2_listener = {
 	[](auto a_data, auto a_this, auto a_format, auto a_fd, auto a_size)
 	{
-		if (a_format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
-			auto buffer = mmap(0, a_size, PROT_READ, MAP_PRIVATE, a_fd, 0);
-			if (buffer == MAP_FAILED) throw std::system_error(errno, std::generic_category());
-			auto& self = *static_cast<t_context*>(a_data);
-			auto keymap = xkb_keymap_new_from_buffer(self.v_xkb, static_cast<char*>(buffer), a_size, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
-			if (!keymap) throw std::runtime_error("xkb_keymap_new_from_buffer");
-			munmap(buffer, a_size);
-			xkb_state_unref(self);
-			self.v_xkb_state = xkb_state_new(keymap);
-			xkb_keymap_unref(keymap);
-			if (!self.v_xkb_state) throw std::runtime_error("xkb_state_new");
-		}
+		if (a_format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) static_cast<t_context*>(a_data)->v_xkb.f_keymap(a_fd, a_size);
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_time, auto a_key, auto a_state)
 	{
 		auto& self = *static_cast<t_context*>(a_data);
-		if (self.v_repeat) {
-			self.v_repeat->f_stop();
-			self.v_repeat = {};
-		}
-		if (self.v_xkb_state) {
-			a_key += 8;
-			auto sym = xkb_state_key_get_one_sym(self, a_key);
-			auto c = xkb_state_key_get_utf32(self, a_key);
-			switch (a_state) {
-			case WL_KEYBOARD_KEY_STATE_PRESSED:
-				if (self.v_repeat_rate > 0 && xkb_keymap_key_repeats(xkb_state_get_keymap(self), a_key)) {
-					self.v_repeat = suisha::f_loop().f_timer([&self, sym, c]
-					{
-						self.f_process(sym, c);
-						if (self.v_repeat_rate > 0) self.v_repeat = suisha::f_loop().f_timer([&self, sym, c]
-						{
-							self.f_process(sym, c);
-						}, std::chrono::ceil<std::chrono::milliseconds>(1000000000ns / self.v_repeat_rate));
-					}, std::chrono::milliseconds(self.v_repeat_delay), true);
-				}
-				self.f_process(sym, c);
-				break;
-			}
-		}
+		self.v_xkb.f_stop();
+		auto press = [&self](auto sym, auto c)
+		{
+			self.f_process(sym, c);
+		};
+		self.v_xkb.f_key(a_key, a_state, press, press, [](auto, auto)
+		{
+		});
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_depressed, auto a_latched, auto a_locked, auto a_group)
 	{
 		auto& self = *static_cast<t_context*>(a_data);
-		if (self.v_xkb_state) xkb_state_update_mask(self, a_depressed, a_latched, a_locked, a_group, a_group, a_group);
+		if (self.v_xkb) xkb_state_update_mask(self.v_xkb, a_depressed, a_latched, a_locked, a_group, a_group, a_group);
 	},
 	[](auto a_data, auto a_this, auto a_rate, auto a_delay)
 	{
-		auto& self = *static_cast<t_context*>(a_data);
-		self.v_repeat_rate = a_rate;
-		self.v_repeat_delay = a_delay;
+		static_cast<t_context*>(a_data)->v_xkb.f_repeat(a_rate, a_delay);
 	}
 };
 
