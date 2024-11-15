@@ -37,309 +37,280 @@ extern "C"
 #include <xkbcommon/xkbcommon.h>
 
 /* For brevity's sake, struct members are annotated where they are used. */
-enum tinywl_cursor_mode
+enum t_cursor_mode
 {
-	TINYWL_CURSOR_PASSTHROUGH,
-	TINYWL_CURSOR_MOVE,
-	TINYWL_CURSOR_RESIZE
+	c_CURSOR_PASSTHROUGH,
+	c_CURSOR_MOVE,
+	c_CURSOR_RESIZE
 };
 
-struct tinywl_toplevel;
-struct tinywl_input_method;
-struct tinywl_text_input;
+struct t_toplevel;
+struct t_input_method;
+struct t_text_input;
 
-struct tinywl_server
+struct t_server
 {
-	struct wl_display* wl_display = wl_display_create();
-	wlr_backend* backend;
-	wlr_renderer* renderer = NULL;
-	wlr_allocator* allocator = NULL;
-	wlr_scene* scene = NULL;
-	wlr_scene_output_layout* scene_layout;
+	wl_display* v_display = wl_display_create();
+	wlr_backend* v_backend;
+	wlr_renderer* v_renderer = NULL;
+	wlr_allocator* v_allocator = NULL;
+	wlr_scene* v_scene = NULL;
+	wlr_scene_output_layout* v_scene_layout;
 
-	wlr_xdg_shell* xdg_shell;
-	wl_listener new_xdg_toplevel;
-	wl_listener new_xdg_popup;
-	wl_list toplevels;
+	wlr_xdg_shell* v_xdg_shell;
+	wl_listener v_new_xdg_toplevel;
+	wl_listener v_new_xdg_popup;
+	wl_list v_toplevels;
 
-	wlr_cursor* cursor = NULL;
-	wlr_xcursor_manager* cursor_mgr = NULL;
-	wl_listener cursor_motion;
-	wl_listener cursor_motion_absolute;
-	wl_listener cursor_button;
-	wl_listener cursor_axis;
-	wl_listener cursor_frame;
+	wlr_cursor* v_cursor = NULL;
+	wlr_xcursor_manager* v_xcursor_manager = NULL;
+	wl_listener v_cursor_motion;
+	wl_listener v_cursor_motion_absolute;
+	wl_listener v_cursor_button;
+	wl_listener v_cursor_axis;
+	wl_listener v_cursor_frame;
 
-	wlr_seat* seat;
-	wl_listener new_input;
-	wl_listener request_cursor;
-	wl_listener request_set_selection;
-	wl_list keyboards;
-	tinywl_cursor_mode cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
-	tinywl_toplevel* grabbed_toplevel;
-	double grab_x, grab_y;
-	wlr_box grab_geobox;
-	uint32_t resize_edges;
+	wlr_seat* v_seat;
+	wl_listener v_new_input;
+	wl_listener v_request_cursor;
+	wl_listener v_request_set_selection;
+	wl_list v_keyboards;
+	t_cursor_mode v_cursor_mode = c_CURSOR_PASSTHROUGH;
+	t_toplevel* v_grabbed_toplevel;
+	double v_grab_x, v_grab_y;
+	wlr_box v_grab_geobox;
+	uint32_t v_resize_edges;
 
-	wlr_output_layout* output_layout;
-	wl_list outputs;
-	wl_listener new_output;
+	wlr_output_layout* v_output_layout;
+	wl_list v_outputs;
+	wl_listener v_new_output;
 
-	wlr_input_method_manager_v2* input_method_manager;
-	wl_listener input_method_input_method;
-	tinywl_input_method* input_method = nullptr;
-	wlr_text_input_manager_v3* text_input_manager;
-	wl_listener text_input_text_input;
-	wl_listener keyboard_state_focus_change;
-	tinywl_text_input* focused_text_input = nullptr;
+	wlr_input_method_manager_v2* v_input_method_manager;
+	wl_listener v_input_method_input_method;
+	t_input_method* v_input_method = nullptr;
+	wlr_text_input_manager_v3* v_text_input_manager;
+	wl_listener v_text_input_text_input;
+	wl_listener v_keyboard_state_focus_change;
+	t_text_input* v_focused_text_input = nullptr;
 
-	tinywl_server();
-	~tinywl_server()
+	t_server();
+	~t_server()
 	{
-		wl_display_destroy_clients(wl_display);
-		if (scene) wlr_scene_node_destroy(&scene->tree.node);
-		wlr_xcursor_manager_destroy(cursor_mgr);
-		if (cursor) wlr_cursor_destroy(cursor);
-		wlr_allocator_destroy(allocator);
-		wlr_renderer_destroy(renderer);
-		wlr_backend_destroy(backend);
-		wl_display_destroy(wl_display);
+		wl_display_destroy_clients(v_display);
+		if (v_scene) wlr_scene_node_destroy(&v_scene->tree.node);
+		wlr_xcursor_manager_destroy(v_xcursor_manager);
+		if (v_cursor) wlr_cursor_destroy(v_cursor);
+		wlr_allocator_destroy(v_allocator);
+		wlr_renderer_destroy(v_renderer);
+		wlr_backend_destroy(v_backend);
+		wl_display_destroy(v_display);
 	}
-	tinywl_toplevel* desktop_toplevel_at(double lx, double ly, wlr_surface** surface, double* sx, double* sy)
+	t_toplevel* f_desktop_toplevel_at(double a_lx, double a_ly, wlr_surface** a_surface, double* a_sx, double* a_sy)
 	{
-		auto node = wlr_scene_node_at(&scene->tree.node, lx, ly, sx, sy);
+		auto node = wlr_scene_node_at(&v_scene->tree.node, a_lx, a_ly, a_sx, a_sy);
 		if (!node || node->type != WLR_SCENE_NODE_BUFFER) return nullptr;
 		auto scene_buffer = wlr_scene_buffer_from_node(node);
 		auto scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
 		if (!scene_surface) return nullptr;
-		*surface = scene_surface->surface;
+		*a_surface = scene_surface->surface;
 		auto tree = node->parent;
 		while (tree && !tree->node.data) tree = tree->node.parent;
-		return tree ? static_cast<tinywl_toplevel*>(tree->node.data) : nullptr;
+		return tree ? static_cast<t_toplevel*>(tree->node.data) : nullptr;
 	}
-	void reset_cursor_mode()
+	void f_reset_cursor_mode()
 	{
-		cursor_mode = TINYWL_CURSOR_PASSTHROUGH;
-		grabbed_toplevel = nullptr;
+		v_cursor_mode = c_CURSOR_PASSTHROUGH;
+		v_grabbed_toplevel = nullptr;
 	}
-	void process_cursor_resize(uint32_t time);
-	void process_cursor_motion(uint32_t time);
+	void f_process_cursor_resize(uint32_t a_time);
+	void f_process_cursor_motion(uint32_t a_time);
 };
 
-struct tinywl_output
+struct t_output
 {
-	wl_list link;
-	tinywl_server* server;
-	struct wlr_output* wlr_output;
-	wl_listener frame;
-	wl_listener request_state;
-	wl_listener destroy;
+	wl_list v_link;
+	t_server* v_server;
+	wlr_output* v_output;
+	wl_listener v_frame;
+	wl_listener v_request_state;
+	wl_listener v_destroy;
 
-	tinywl_output(tinywl_server* server, struct wlr_output* output);
-	~tinywl_output()
+	t_output(t_server* a_server, wlr_output* a_output);
+	~t_output()
 	{
-		wl_list_remove(&frame.link);
-		wl_list_remove(&request_state.link);
-		wl_list_remove(&destroy.link);
-		wl_list_remove(&link);
+		wl_list_remove(&v_link);
 	}
 };
 
-struct tinywl_toplevel
+struct t_toplevel
 {
-	wl_list link;
-	tinywl_server* server;
-	wlr_xdg_toplevel* xdg_toplevel;
-	wlr_scene_tree* scene_tree;
-	wl_listener map;
-	wl_listener unmap;
-	wl_listener commit;
-	wl_listener destroy;
-	wl_listener request_move;
-	wl_listener request_resize;
-	wl_listener request_maximize;
-	wl_listener request_fullscreen;
+	wl_list v_link;
+	t_server* v_server;
+	wlr_xdg_toplevel* v_toplevel;
+	wlr_scene_tree* v_scene_tree;
+	wl_listener v_map;
+	wl_listener v_unmap;
+	wl_listener v_commit;
+	wl_listener v_destroy;
+	wl_listener v_request_move;
+	wl_listener v_request_resize;
+	wl_listener v_request_maximize;
+	wl_listener v_request_fullscreen;
 
-	tinywl_toplevel(tinywl_server* server, wlr_xdg_toplevel* toplevel);
-	~tinywl_toplevel()
+	t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel);
+	// TODO: need a_surface?
+	void f_focus(wlr_surface* a_surface)
 	{
-		wl_list_remove(&map.link);
-		wl_list_remove(&unmap.link);
-		wl_list_remove(&commit.link);
-		wl_list_remove(&destroy.link);
-		wl_list_remove(&request_move.link);
-		wl_list_remove(&request_resize.link);
-		wl_list_remove(&request_maximize.link);
-		wl_list_remove(&request_fullscreen.link);
-	}
-	void focus(wlr_surface* surface)
-	{
-		auto seat = server->seat;
+		auto seat = v_server->v_seat;
 		auto current = seat->keyboard_state.focused_surface;
-		if (current == surface) return;
+		if (current == a_surface) return;
 		if (current) if (auto p = wlr_xdg_toplevel_try_from_wlr_surface(current)) wlr_xdg_toplevel_set_activated(p, false);
-		wlr_scene_node_raise_to_top(&scene_tree->node);
-		wl_list_remove(&link);
-		wl_list_insert(&server->toplevels, &link);
-		wlr_xdg_toplevel_set_activated(xdg_toplevel, true);
-		if (auto p = wlr_seat_get_keyboard(seat)) wlr_seat_keyboard_notify_enter(seat, xdg_toplevel->base->surface, p->keycodes, p->num_keycodes, &p->modifiers);
+		wlr_scene_node_raise_to_top(&v_scene_tree->node);
+		wl_list_remove(&v_link);
+		wl_list_insert(&v_server->v_toplevels, &v_link);
+		wlr_xdg_toplevel_set_activated(v_toplevel, true);
+		if (auto p = wlr_seat_get_keyboard(seat)) wlr_seat_keyboard_notify_enter(seat, v_toplevel->base->surface, p->keycodes, p->num_keycodes, &p->modifiers);
 	}
 };
 
-struct tinywl_popup
+struct t_popup
 {
-	wlr_xdg_popup* xdg_popup;
-	wl_listener commit;
-	wl_listener destroy;
+	wlr_xdg_popup* v_popup;
+	wl_listener v_commit;
+	wl_listener v_destroy;
 
-	tinywl_popup(wlr_xdg_popup* popup);
-	~tinywl_popup()
+	t_popup(wlr_xdg_popup* a_popup);
+};
+
+struct t_keyboard
+{
+	wl_list v_link;
+	t_server* v_server;
+	wlr_keyboard* v_keyboard;
+	wl_listener v_modifiers;
+	wl_listener v_key;
+	wl_listener v_destroy;
+
+	t_keyboard(t_server* a_server, wlr_input_device* a_device);
+	~t_keyboard()
 	{
-		wl_list_remove(&commit.link);
-		wl_list_remove(&destroy.link);
+		wl_list_remove(&v_link);
 	}
 };
 
-struct tinywl_keyboard
+struct t_input_method
 {
-	wl_list link;
-	tinywl_server* server;
-	struct wlr_keyboard* wlr_keyboard;
+	t_server* v_server;
+	wlr_input_method_v2* v_input_method;
+	bool v_on = false;
+	wl_listener v_commit;
+	wl_listener v_new_popup_surface;
+	wl_listener v_destroy;
 
-	wl_listener modifiers;
-	wl_listener key;
-	wl_listener destroy;
-
-	tinywl_keyboard(tinywl_server* server, wlr_input_device* device);
-	~tinywl_keyboard()
+	t_input_method(t_server* a_server, wlr_input_method_v2* a_input_method);
+	~t_input_method()
 	{
-		wl_list_remove(&modifiers.link);
-		wl_list_remove(&key.link);
-		wl_list_remove(&destroy.link);
-		wl_list_remove(&link);
-	}
-};
-
-struct tinywl_input_method
-{
-	tinywl_server* server;
-	wlr_input_method_v2* input_method;
-	bool on = false;
-	wl_listener commit;
-	wl_listener new_popup_surface;
-	wl_listener grab_keyboard;
-	wl_listener destroy;
-	wl_listener grab_destroy;
-
-	tinywl_input_method(tinywl_server* server, wlr_input_method_v2* input_method);
-	~tinywl_input_method()
-	{
-		server->input_method = nullptr;
+		v_server->v_input_method = nullptr;
 	}
 	operator wlr_input_method_v2*() const
 	{
-		return input_method;
+		return v_input_method;
 	}
-	void deactivate()
+	void f_deactivate()
 	{
-		wlr_input_method_v2_send_deactivate(input_method);
-		wlr_input_method_v2_send_done(input_method);
+		wlr_input_method_v2_send_deactivate(v_input_method);
+		wlr_input_method_v2_send_done(v_input_method);
 	}
 };
 
-struct tinywl_input_popup
+struct t_input_popup
 {
-	tinywl_server* server;
-	wlr_input_popup_surface_v2* popup;
-	wl_listener commit;
-	wl_listener map;
-	wl_listener unmap;
-	wl_listener destroy;
+	t_server* v_server;
+	wlr_input_popup_surface_v2* v_popup;
+	wl_listener v_commit;
+	wl_listener v_map;
+	wl_listener v_unmap;
+	wl_listener v_destroy;
 
-	tinywl_input_popup(tinywl_input_method* input, wlr_input_popup_surface_v2* popup);
-	void move(wlr_text_input_v3* input)
+	t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_popup);
+	void f_move(wlr_text_input_v3* a_input)
 	{
-		auto cursor = input->current.cursor_rectangle;
-		auto& node0 = static_cast<wlr_scene_tree*>(wlr_xdg_surface_try_from_wlr_surface(input->focused_surface)->data)->node;
+		auto cursor = a_input->current.cursor_rectangle;
+		auto& node0 = static_cast<wlr_scene_tree*>(wlr_xdg_surface_try_from_wlr_surface(a_input->focused_surface)->data)->node;
 		cursor.x += node0.x;
 		cursor.y += node0.y;
 		wlr_box box;
-		wlr_output_layout_get_box(server->output_layout, wlr_output_layout_output_at(server->output_layout, cursor.x, cursor.y), &box);
-		auto& buffer = popup->surface->buffer->base;
+		wlr_output_layout_get_box(v_server->v_output_layout, wlr_output_layout_output_at(v_server->v_output_layout, cursor.x, cursor.y), &box);
+		auto& buffer = v_popup->surface->buffer->base;
 		auto x = cursor.x;
 		if (auto right = box.x + box.width; x + buffer.width > right) x = std::max(right - buffer.width, box.x);
 		auto y = cursor.y + cursor.height;
 		if (y + buffer.height > box.y + box.height) if (auto y1 = cursor.y - buffer.height; y1 >= box.y) y = y1;
-		auto& node1 = static_cast<wlr_scene_surface*>(popup->surface->data)->buffer->node;
+		auto& node1 = static_cast<wlr_scene_surface*>(v_popup->surface->data)->buffer->node;
 		wlr_scene_node_set_position(&node1, x, y);
 		cursor.x -= node1.x;
 		cursor.y -= node1.y;
-		wlr_input_popup_surface_v2_send_text_input_rectangle(popup, &cursor);
+		wlr_input_popup_surface_v2_send_text_input_rectangle(v_popup, &cursor);
 	}
 };
 
-struct tinywl_text_input
+struct t_text_input
 {
-	tinywl_server* server;
-	wlr_text_input_v3* text_input;
-	wl_listener enable;
-	wl_listener commit;
-	wl_listener disable;
-	wl_listener destroy;
-	std::string preedit;
-	int32_t begin;
-	int32_t end;
+	t_server* v_server;
+	wlr_text_input_v3* v_text_input;
+	wl_listener v_enable;
+	wl_listener v_commit;
+	wl_listener v_disable;
+	wl_listener v_destroy;
 
-	tinywl_text_input(tinywl_server* server, wlr_text_input_v3* text_input) : server(server), text_input(text_input)
+	t_text_input(t_server* a_server, wlr_text_input_v3* a_text_input) : v_server(a_server), v_text_input(a_text_input)
 	{
-		enable.notify = [](auto a_listener, auto a_data)
+		v_enable.notify = [](auto a_listener, auto a_data)
 		{
-			tinywl_text_input* self = wl_container_of(a_listener, self, enable);
-			self->server->focused_text_input = self;
-			if (auto p = self->server->input_method; p && p->on) {
+			t_text_input* self = wl_container_of(a_listener, self, v_enable);
+			self->v_server->v_focused_text_input = self;
+			if (auto p = self->v_server->v_input_method; p && p->v_on) {
 				wlr_input_method_v2_send_activate(*p);
-				self->send();
+				self->f_send();
 			}
-			wlr_text_input_v3_send_done(self->text_input);
+			wlr_text_input_v3_send_done(self->v_text_input);
 		};
-		wl_signal_add(&text_input->events.enable, &enable);
-		commit.notify = [](auto a_listener, auto a_data)
+		wl_signal_add(&v_text_input->events.enable, &v_enable);
+		v_commit.notify = [](auto a_listener, auto a_data)
 		{
-			tinywl_text_input* self = wl_container_of(a_listener, self, commit);
-			if (auto p = self->server->input_method; p && p->on) self->send();
-			wlr_text_input_v3_send_done(self->text_input);
+			t_text_input* self = wl_container_of(a_listener, self, v_commit);
+			if (auto p = self->v_server->v_input_method; p && p->v_on) self->f_send();
+			wlr_text_input_v3_send_done(self->v_text_input);
 		};
-		wl_signal_add(&text_input->events.commit, &commit);
-		disable.notify = [](auto a_listener, auto a_data)
+		wl_signal_add(&v_text_input->events.commit, &v_commit);
+		v_disable.notify = [](auto a_listener, auto a_data)
 		{
-			tinywl_text_input* self = wl_container_of(a_listener, self, disable);
-			if (auto p = self->server->input_method; p && p->on) p->deactivate();
-			self->server->focused_text_input = nullptr;
-			self->preedit = {};
-			self->begin = self->end = 0;
-			wlr_text_input_v3_send_done(self->text_input);
+			t_text_input* self = wl_container_of(a_listener, self, v_disable);
+			if (auto p = self->v_server->v_input_method; p && p->v_on) p->f_deactivate();
+			self->v_server->v_focused_text_input = nullptr;
+			wlr_text_input_v3_send_done(self->v_text_input);
 		};
-		wl_signal_add(&text_input->events.disable, &disable);
-		destroy.notify = [](auto a_listener, auto a_data)
+		wl_signal_add(&v_text_input->events.disable, &v_disable);
+		v_destroy.notify = [](auto a_listener, auto a_data)
 		{
-			tinywl_text_input* self = wl_container_of(a_listener, self, destroy);
+			t_text_input* self = wl_container_of(a_listener, self, v_destroy);
 			delete self;
 		};
-		wl_signal_add(&text_input->events.destroy, &destroy);
+		wl_signal_add(&v_text_input->events.destroy, &v_destroy);
 	}
-	~tinywl_text_input()
+	~t_text_input()
 	{
-		if (auto p = server->input_method; p && p->on) p->deactivate();
-		if (server->focused_text_input == this) server->focused_text_input = nullptr;
+		if (auto p = v_server->v_input_method; p && p->v_on) p->f_deactivate();
+		if (v_server->v_focused_text_input == this) v_server->v_focused_text_input = nullptr;
 	}
 	operator wlr_text_input_v3*() const
 	{
-		return text_input;
+		return v_text_input;
 	}
-	void send()
+	void f_send()
 	{
-		auto p = server->input_method;
-		auto& state = text_input->current;
+		auto p = v_server->v_input_method;
+		auto& state = v_text_input->current;
 		auto& surrounding = state.surrounding;
 		wlr_input_method_v2_send_surrounding_text(*p, surrounding.text, surrounding.cursor, surrounding.anchor);
 		wlr_input_method_v2_send_text_change_cause(*p, state.text_change_cause);
@@ -347,17 +318,17 @@ struct tinywl_text_input
 		wlr_input_method_v2_send_content_type(*p, type.hint, type.purpose);
 		wlr_input_method_v2_send_done(*p);
 		wlr_input_popup_surface_v2* popup;
-		wl_list_for_each(popup, &p->input_method->popup_surfaces, link) if (popup->surface->data) static_cast<tinywl_input_popup*>(popup->data)->move(text_input);
+		wl_list_for_each(popup, &p->v_input_method->popup_surfaces, link) if (popup->surface->data) static_cast<t_input_popup*>(popup->data)->f_move(v_text_input);
 	}
 };
 
-tinywl_input_method::tinywl_input_method(tinywl_server* server, wlr_input_method_v2* input_method) : server(server), input_method(input_method)
+t_input_method::t_input_method(t_server* a_server, wlr_input_method_v2* a_input_method) : v_server(a_server), v_input_method(a_input_method)
 {
-	commit.notify = [](auto a_listener, auto a_data)
+	v_commit.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_input_method* self = wl_container_of(a_listener, self, commit);
-		if (auto p = self->server->focused_text_input) {
-			auto& state = self->input_method->current;
+		t_input_method* self = wl_container_of(a_listener, self, v_commit);
+		if (auto p = self->v_server->v_focused_text_input) {
+			auto& state = self->v_input_method->current;
 			auto& preedit = state.preedit;
 			wlr_text_input_v3_send_preedit_string(*p, preedit.text, preedit.cursor_begin, preedit.cursor_end);
 			wlr_text_input_v3_send_commit_string(*p, state.commit_text);
@@ -366,473 +337,456 @@ tinywl_input_method::tinywl_input_method(tinywl_server* server, wlr_input_method
 			wlr_text_input_v3_send_done(*p);
 		}
 	};
-	wl_signal_add(&input_method->events.commit, &commit);
-	new_popup_surface.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_input_method->events.commit, &v_commit);
+	v_new_popup_surface.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_input_method* self = wl_container_of(a_listener, self, new_popup_surface);
-		new tinywl_input_popup(self, static_cast<wlr_input_popup_surface_v2*>(a_data));
+		t_input_method* self = wl_container_of(a_listener, self, v_new_popup_surface);
+		new t_input_popup(self->v_server, static_cast<wlr_input_popup_surface_v2*>(a_data));
 	};
-	wl_signal_add(&input_method->events.new_popup_surface, &new_popup_surface);
-	grab_keyboard.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_input_method->events.new_popup_surface, &v_new_popup_surface);
+	v_destroy.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_input_method* self = wl_container_of(a_listener, self, grab_keyboard);
-		auto grab = static_cast<wlr_input_method_keyboard_grab_v2*>(a_data);
-		wl_signal_add(&grab->events.destroy, &self->grab_destroy);
-	};
-	wl_signal_add(&input_method->events.grab_keyboard, &grab_keyboard);
-	destroy.notify = [](auto a_listener, auto a_data)
-	{
-		tinywl_input_method* self = wl_container_of(a_listener, self, destroy);
+		t_input_method* self = wl_container_of(a_listener, self, v_destroy);
 		delete self;
 	};
-	wl_signal_add(&input_method->events.destroy, &destroy);
-	grab_destroy.notify = [](auto a_listener, auto a_data)
-	{
-		tinywl_input_method* self = wl_container_of(a_listener, self, grab_destroy);
-	};
-	server->input_method = this;
+	wl_signal_add(&v_input_method->events.destroy, &v_destroy);
+	v_server->v_input_method = this;
 }
 
-tinywl_input_popup::tinywl_input_popup(tinywl_input_method* input, wlr_input_popup_surface_v2* popup) : server(input->server), popup(popup)
+t_input_popup::t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_popup) : v_server(a_server), v_popup(a_popup)
 {
-	popup->data = this;
-	commit.notify = [](auto a_listener, auto a_data)
+	v_popup->data = this;
+	v_commit.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_input_popup* self = wl_container_of(a_listener, self, commit);
-		if (self->popup->surface->data) self->move(self->server->focused_text_input->text_input);
+		t_input_popup* self = wl_container_of(a_listener, self, v_commit);
+		if (self->v_popup->surface->data) self->f_move(self->v_server->v_focused_text_input->v_text_input);
 	};
-	wl_signal_add(&popup->surface->events.commit, &commit);
-	map.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_popup->surface->events.commit, &v_commit);
+	v_map.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_input_popup* self = wl_container_of(a_listener, self, map);
-		self->popup->surface->data = wlr_scene_surface_create(&self->server->scene->tree, self->popup->surface);
-		self->move(self->server->focused_text_input->text_input);
+		t_input_popup* self = wl_container_of(a_listener, self, v_map);
+		self->v_popup->surface->data = wlr_scene_surface_create(&self->v_server->v_scene->tree, self->v_popup->surface);
+		self->f_move(self->v_server->v_focused_text_input->v_text_input);
 	};
-	wl_signal_add(&popup->surface->events.map, &map);
-	unmap.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_popup->surface->events.map, &v_map);
+	v_unmap.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_input_popup* self = wl_container_of(a_listener, self, unmap);
-		wlr_scene_node_destroy(&static_cast<wlr_scene_surface*>(self->popup->surface->data)->buffer->node);
-		self->popup->surface->data = nullptr;
+		t_input_popup* self = wl_container_of(a_listener, self, v_unmap);
+		wlr_scene_node_destroy(&static_cast<wlr_scene_surface*>(self->v_popup->surface->data)->buffer->node);
+		self->v_popup->surface->data = nullptr;
 	};
-	wl_signal_add(&popup->surface->events.unmap, &unmap);
-	destroy.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_popup->surface->events.unmap, &v_unmap);
+	v_destroy.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_input_popup* self = wl_container_of(a_listener, self, destroy);
+		t_input_popup* self = wl_container_of(a_listener, self, v_destroy);
 		delete self;
 	};
-	wl_signal_add(&popup->events.destroy, &destroy);
+	wl_signal_add(&v_popup->events.destroy, &v_destroy);
 }
 
-tinywl_keyboard::tinywl_keyboard(tinywl_server* server, wlr_input_device* device) : server(server), wlr_keyboard(wlr_keyboard_from_input_device(device))
+t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_server(a_server), v_keyboard(wlr_keyboard_from_input_device(a_device))
 {
 	auto context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 	auto keymap = xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
-	wlr_keyboard_set_keymap(wlr_keyboard, keymap);
+	wlr_keyboard_set_keymap(v_keyboard, keymap);
 	xkb_keymap_unref(keymap);
 	xkb_context_unref(context);
-	wlr_keyboard_set_repeat_info(wlr_keyboard, 25, 600);
-	modifiers.notify = [](auto listener, auto data)
+	wlr_keyboard_set_repeat_info(v_keyboard, 25, 600);
+	v_modifiers.notify = [](auto listener, auto data)
 	{
-		tinywl_keyboard* keyboard = wl_container_of(listener, keyboard, modifiers);
-		if (auto p = keyboard->server->input_method) if (auto q = p->input_method->keyboard_grab) {
-			wlr_input_method_keyboard_grab_v2_set_keyboard(q, keyboard->wlr_keyboard);
-			wlr_input_method_keyboard_grab_v2_send_modifiers(q, &keyboard->wlr_keyboard->modifiers);
+		t_keyboard* self = wl_container_of(listener, self, v_modifiers);
+		if (auto p = self->v_server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
+			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
+			wlr_input_method_keyboard_grab_v2_send_modifiers(q, &self->v_keyboard->modifiers);
 			return;
 		}
-		wlr_seat_set_keyboard(keyboard->server->seat, keyboard->wlr_keyboard);
-		wlr_seat_keyboard_notify_modifiers(keyboard->server->seat, &keyboard->wlr_keyboard->modifiers);
+		wlr_seat_set_keyboard(self->v_server->v_seat, self->v_keyboard);
+		wlr_seat_keyboard_notify_modifiers(self->v_server->v_seat, &self->v_keyboard->modifiers);
 	};
-	wl_signal_add(&wlr_keyboard->events.modifiers, &modifiers);
-	key.notify = [](auto listener, auto data)
+	wl_signal_add(&v_keyboard->events.modifiers, &v_modifiers);
+	v_key.notify = [](auto listener, auto data)
 	{
-		tinywl_keyboard* keyboard = wl_container_of(listener, keyboard, key);
-		auto server = keyboard->server;
+		t_keyboard* self = wl_container_of(listener, self, v_key);
+		auto server = self->v_server;
 		auto event = static_cast<wlr_keyboard_key_event*>(data);
 		if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-			auto sym = xkb_state_key_get_one_sym(keyboard->wlr_keyboard->xkb_state, event->keycode + 8);
-			if (wlr_keyboard_get_modifiers(keyboard->wlr_keyboard) & WLR_MODIFIER_ALT)
+			auto sym = xkb_state_key_get_one_sym(self->v_keyboard->xkb_state, event->keycode + 8);
+			if (wlr_keyboard_get_modifiers(self->v_keyboard) & WLR_MODIFIER_ALT)
 				switch (sym) {
 				case XKB_KEY_Escape:
-					wl_display_terminate(server->wl_display);
+					wl_display_terminate(server->v_display);
 					return;
 				case XKB_KEY_F1:
-					if (wl_list_length(&server->toplevels) > 1) {
-						tinywl_toplevel* p = wl_container_of(server->toplevels.prev, p, link);
-						p->focus(p->xdg_toplevel->base->surface);
+					if (wl_list_length(&server->v_toplevels) > 1) {
+						t_toplevel* p = wl_container_of(server->v_toplevels.prev, p, v_link);
+						p->f_focus(p->v_toplevel->base->surface);
 					}
 					return;
 				}
-			if (sym == XKB_KEY_Kanji || sym == XKB_KEY_Eisu_toggle) if (auto p = server->input_method) if (auto q = server->focused_text_input) {
-				p->on ^= true;
-				if (p->on) {
+			if (sym == XKB_KEY_Kanji || sym == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
+				p->v_on ^= true;
+				if (p->v_on) {
 					wlr_input_method_v2_send_activate(*p);
-					q->send();
+					q->f_send();
 				} else {
-					p->deactivate();
+					p->f_deactivate();
 					wlr_text_input_v3_send_preedit_string(*q, NULL, 0, 0);
 					wlr_text_input_v3_send_done(*q);
 				}
 				return;
 			}
 		}
-		if (auto p = server->input_method) if (auto q = p->input_method->keyboard_grab) {
-			wlr_input_method_keyboard_grab_v2_set_keyboard(q, keyboard->wlr_keyboard);
+		if (auto p = server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
+			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
 			wlr_input_method_keyboard_grab_v2_send_key(q, event->time_msec, event->keycode, event->state);
 			return;
 		}
-		auto seat = server->seat;
-		wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
+		auto seat = server->v_seat;
+		wlr_seat_set_keyboard(seat, self->v_keyboard);
 		wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
 	};
-	wl_signal_add(&wlr_keyboard->events.key, &key);
-	destroy.notify = [](auto listener, auto data)
+	wl_signal_add(&v_keyboard->events.key, &v_key);
+	v_destroy.notify = [](auto listener, auto data)
 	{
-		tinywl_keyboard* keyboard = wl_container_of(listener, keyboard, destroy);
-		delete keyboard;
+		t_keyboard* self = wl_container_of(listener, self, v_destroy);
+		delete self;
 	};
-	wl_signal_add(&device->events.destroy, &destroy);
-	wlr_seat_set_keyboard(server->seat, wlr_keyboard);
-	wl_list_insert(&server->keyboards, &link);
+	wl_signal_add(&a_device->events.destroy, &v_destroy);
+	wlr_seat_set_keyboard(v_server->v_seat, v_keyboard);
+	wl_list_insert(&v_server->v_keyboards, &v_link);
 }
 
-tinywl_output::tinywl_output(tinywl_server* server, struct wlr_output* output) : server(server), wlr_output(output)
+t_output::t_output(t_server* a_server, wlr_output* a_output) : v_server(a_server), v_output(a_output)
 {
-	wlr_output_init_render(wlr_output, server->allocator, server->renderer);
+	wlr_output_init_render(v_output, v_server->v_allocator, v_server->v_renderer);
 	wlr_output_state state;
 	wlr_output_state_init(&state);
 	wlr_output_state_set_enabled(&state, true);
-	if (auto mode = wlr_output_preferred_mode(wlr_output)) wlr_output_state_set_mode(&state, mode);
-	wlr_output_commit_state(wlr_output, &state);
+	if (auto mode = wlr_output_preferred_mode(v_output)) wlr_output_state_set_mode(&state, mode);
+	wlr_output_commit_state(v_output, &state);
 	wlr_output_state_finish(&state);
-	frame.notify = [](auto listener, auto data)
+	v_frame.notify = [](auto listener, auto data)
 	{
-		tinywl_output* output = wl_container_of(listener, output, frame);
-		auto scene = output->server->scene;
-		auto scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
+		t_output* self = wl_container_of(listener, self, v_frame);
+		auto scene = self->v_server->v_scene;
+		auto scene_output = wlr_scene_get_scene_output(scene, self->v_output);
 		wlr_scene_output_commit(scene_output, NULL);
 		timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		wlr_scene_output_send_frame_done(scene_output, &now);
 	};
-	wl_signal_add(&wlr_output->events.frame, &frame);
-	request_state.notify = [](auto listener, auto data)
+	wl_signal_add(&v_output->events.frame, &v_frame);
+	v_request_state.notify = [](auto listener, auto data)
 	{
-		tinywl_output* output = wl_container_of(listener, output, request_state);
+		t_output* self = wl_container_of(listener, self, v_request_state);
 		auto event = static_cast<wlr_output_event_request_state*>(data);
-		wlr_output_commit_state(output->wlr_output, event->state);
+		wlr_output_commit_state(self->v_output, event->state);
 	};
-	wl_signal_add(&wlr_output->events.request_state, &request_state);
-	destroy.notify = [](auto listener, auto data)
+	wl_signal_add(&v_output->events.request_state, &v_request_state);
+	v_destroy.notify = [](auto listener, auto data)
 	{
-		tinywl_output* output = wl_container_of(listener, output, destroy);
-		delete output;
+		t_output* self = wl_container_of(listener, self, v_destroy);
+		delete self;
 	};
-	wl_signal_add(&wlr_output->events.destroy, &destroy);
-	wl_list_insert(&server->outputs, &link);
-	auto l_output = wlr_output_layout_add_auto(server->output_layout, wlr_output);
-	auto scene_output = wlr_scene_output_create(server->scene, wlr_output);
-	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
+	wl_signal_add(&v_output->events.destroy, &v_destroy);
+	wl_list_insert(&v_server->v_outputs, &v_link);
+	auto l_output = wlr_output_layout_add_auto(v_server->v_output_layout, v_output);
+	auto scene_output = wlr_scene_output_create(v_server->v_scene, v_output);
+	wlr_scene_output_layout_add_output(v_server->v_scene_layout, l_output, scene_output);
 }
 
-tinywl_toplevel::tinywl_toplevel(tinywl_server* server, wlr_xdg_toplevel* toplevel) : server(server), xdg_toplevel(toplevel)
+t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_server(a_server), v_toplevel(a_toplevel)
 {
-	scene_tree = wlr_scene_xdg_surface_create(&server->scene->tree, xdg_toplevel->base);
-	scene_tree->node.data = this;
-	xdg_toplevel->base->data = scene_tree;
-	map.notify = [](auto listener, auto data)
+	v_scene_tree = wlr_scene_xdg_surface_create(&v_server->v_scene->tree, v_toplevel->base);
+	v_scene_tree->node.data = this;
+	v_toplevel->base->data = v_scene_tree;
+	v_map.notify = [](auto listener, auto data)
 	{
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, map);
-		wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
-		toplevel->focus(toplevel->xdg_toplevel->base->surface);
+		t_toplevel* self = wl_container_of(listener, self, v_map);
+		wl_list_insert(&self->v_server->v_toplevels, &self->v_link);
+		self->f_focus(self->v_toplevel->base->surface);
 	};
-	wl_signal_add(&xdg_toplevel->base->surface->events.map, &map);
-	unmap.notify = [](auto listener, auto data)
+	wl_signal_add(&v_toplevel->base->surface->events.map, &v_map);
+	v_unmap.notify = [](auto listener, auto data)
 	{
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, unmap);
-		if (toplevel == toplevel->server->grabbed_toplevel) toplevel->server->reset_cursor_mode();
-		wl_list_remove(&toplevel->link);
+		t_toplevel* self = wl_container_of(listener, self, v_unmap);
+		if (self == self->v_server->v_grabbed_toplevel) self->v_server->f_reset_cursor_mode();
+		wl_list_remove(&self->v_link);
 	};
-	wl_signal_add(&xdg_toplevel->base->surface->events.unmap, &unmap);
-	commit.notify = [](auto listener, auto data)
+	wl_signal_add(&v_toplevel->base->surface->events.unmap, &v_unmap);
+	v_commit.notify = [](auto listener, auto data)
 	{
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, commit);
-		if (toplevel->xdg_toplevel->base->initial_commit) wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, 0, 0);
+		t_toplevel* self = wl_container_of(listener, self, v_commit);
+		if (self->v_toplevel->base->initial_commit) wlr_xdg_toplevel_set_size(self->v_toplevel, 0, 0);
 	};
-	wl_signal_add(&xdg_toplevel->base->surface->events.commit, &commit);
-	destroy.notify = [](auto listener, auto data)
+	wl_signal_add(&v_toplevel->base->surface->events.commit, &v_commit);
+	v_destroy.notify = [](auto listener, auto data)
 	{
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, destroy);
-		delete toplevel;
+		t_toplevel* self = wl_container_of(listener, self, v_destroy);
+		delete self;
 	};
-	wl_signal_add(&xdg_toplevel->events.destroy, &destroy);
-	request_move.notify = [](auto listener, auto data)
+	wl_signal_add(&v_toplevel->events.destroy, &v_destroy);
+	v_request_move.notify = [](auto listener, auto data)
 	{
-		/* This event is raised when a client would like to begin an interactive
-		 * move, typically because the user clicked on their client-side
-		 * decorations. Note that a more sophisticated compositor should check the
-		 * provided serial against a list of button press serials sent to this
-		 * client, to prevent the client from requesting this whenever they want. */
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, request_move);
-		auto server = toplevel->server;
-		if (toplevel->xdg_toplevel->base->surface != wlr_surface_get_root_surface(server->seat->pointer_state.focused_surface)) return;
-		server->grabbed_toplevel = toplevel;
-		server->cursor_mode = TINYWL_CURSOR_MOVE;
-		server->grab_x = server->cursor->x - toplevel->scene_tree->node.x;
-		server->grab_y = server->cursor->y - toplevel->scene_tree->node.y;
+		// TODO: check the serial.
+		t_toplevel* self = wl_container_of(listener, self, v_request_move);
+		auto server = self->v_server;
+		if (self->v_toplevel->base->surface != wlr_surface_get_root_surface(server->v_seat->pointer_state.focused_surface)) return;
+		server->v_grabbed_toplevel = self;
+		server->v_cursor_mode = c_CURSOR_MOVE;
+		server->v_grab_x = server->v_cursor->x - self->v_scene_tree->node.x;
+		server->v_grab_y = server->v_cursor->y - self->v_scene_tree->node.y;
 	};
-	wl_signal_add(&xdg_toplevel->events.request_move, &request_move);
-	request_resize.notify = [](auto listener, auto data)
+	wl_signal_add(&v_toplevel->events.request_move, &v_request_move);
+	v_request_resize.notify = [](auto listener, auto data)
 	{
-		/* This event is raised when a client would like to begin an interactive
-		 * resize, typically because the user clicked on their client-side
-		 * decorations. Note that a more sophisticated compositor should check the
-		 * provided serial against a list of button press serials sent to this
-		 * client, to prevent the client from requesting this whenever they want. */
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, request_resize);
-		auto server = toplevel->server;
-		if (toplevel->xdg_toplevel->base->surface != wlr_surface_get_root_surface(server->seat->pointer_state.focused_surface)) return;
-		server->grabbed_toplevel = toplevel;
-		server->cursor_mode = TINYWL_CURSOR_RESIZE;
+		// TODO: check the serial.
+		t_toplevel* self = wl_container_of(listener, self, v_request_resize);
+		auto server = self->v_server;
+		if (self->v_toplevel->base->surface != wlr_surface_get_root_surface(server->v_seat->pointer_state.focused_surface)) return;
+		server->v_grabbed_toplevel = self;
+		server->v_cursor_mode = c_CURSOR_RESIZE;
 		wlr_box geo_box;
-		wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geo_box);
+		wlr_xdg_surface_get_geometry(self->v_toplevel->base, &geo_box);
 		auto edges = static_cast<wlr_xdg_toplevel_resize_event*>(data)->edges;
-		double border_x = (toplevel->scene_tree->node.x + geo_box.x) + ((edges & WLR_EDGE_RIGHT) ? geo_box.width : 0);
-		double border_y = (toplevel->scene_tree->node.y + geo_box.y) + ((edges & WLR_EDGE_BOTTOM) ? geo_box.height : 0);
-		server->grab_x = server->cursor->x - border_x;
-		server->grab_y = server->cursor->y - border_y;
-		server->grab_geobox = geo_box;
-		server->grab_geobox.x += toplevel->scene_tree->node.x;
-		server->grab_geobox.y += toplevel->scene_tree->node.y;
-		server->resize_edges = edges;
+		double border_x = (self->v_scene_tree->node.x + geo_box.x) + ((edges & WLR_EDGE_RIGHT) ? geo_box.width : 0);
+		double border_y = (self->v_scene_tree->node.y + geo_box.y) + ((edges & WLR_EDGE_BOTTOM) ? geo_box.height : 0);
+		server->v_grab_x = server->v_cursor->x - border_x;
+		server->v_grab_y = server->v_cursor->y - border_y;
+		server->v_grab_geobox = geo_box;
+		server->v_grab_geobox.x += self->v_scene_tree->node.x;
+		server->v_grab_geobox.y += self->v_scene_tree->node.y;
+		server->v_resize_edges = edges;
 	};
-	wl_signal_add(&xdg_toplevel->events.request_resize, &request_resize);
-	request_maximize.notify = [](auto listener, auto data)
+	wl_signal_add(&v_toplevel->events.request_resize, &v_request_resize);
+	v_request_maximize.notify = [](auto listener, auto data)
 	{
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, request_maximize);
-		if (toplevel->xdg_toplevel->base->initialized) wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
+		t_toplevel* self = wl_container_of(listener, self, v_request_maximize);
+		if (self->v_toplevel->base->initialized) wlr_xdg_surface_schedule_configure(self->v_toplevel->base);
 	};
-	wl_signal_add(&xdg_toplevel->events.request_maximize, &request_maximize);
-	request_fullscreen.notify = [](auto listener, auto data)
+	wl_signal_add(&v_toplevel->events.request_maximize, &v_request_maximize);
+	v_request_fullscreen.notify = [](auto listener, auto data)
 	{
-		tinywl_toplevel* toplevel = wl_container_of(listener, toplevel, request_fullscreen);
-		if (toplevel->xdg_toplevel->base->initialized) wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
+		t_toplevel* self = wl_container_of(listener, self, v_request_fullscreen);
+		if (self->v_toplevel->base->initialized) wlr_xdg_surface_schedule_configure(self->v_toplevel->base);
 	};
-	wl_signal_add(&xdg_toplevel->events.request_fullscreen, &request_fullscreen);
+	wl_signal_add(&v_toplevel->events.request_fullscreen, &v_request_fullscreen);
 }
 
-tinywl_popup::tinywl_popup(wlr_xdg_popup* popup) : xdg_popup(popup)
+t_popup::t_popup(wlr_xdg_popup* a_popup) : v_popup(a_popup)
 {
-	auto parent = wlr_xdg_surface_try_from_wlr_surface(xdg_popup->parent);
+	auto parent = wlr_xdg_surface_try_from_wlr_surface(v_popup->parent);
 	assert(parent != NULL);
 	auto parent_tree = static_cast<wlr_scene_tree*>(parent->data);
-	xdg_popup->base->data = wlr_scene_xdg_surface_create(parent_tree, xdg_popup->base);
-	commit.notify = [](auto listener, auto data)
+	v_popup->base->data = wlr_scene_xdg_surface_create(parent_tree, v_popup->base);
+	v_commit.notify = [](auto listener, auto data)
 	{
-		tinywl_popup* popup = wl_container_of(listener, popup, commit);
-		if (popup->xdg_popup->base->initial_commit) wlr_xdg_surface_schedule_configure(popup->xdg_popup->base);
+		t_popup* self = wl_container_of(listener, self, v_commit);
+		// TODO: adjust the position.
+		if (self->v_popup->base->initial_commit) wlr_xdg_surface_schedule_configure(self->v_popup->base);
 	};
-	wl_signal_add(&xdg_popup->base->surface->events.commit, &commit);
-	destroy.notify = [](auto listener, auto data)
+	wl_signal_add(&v_popup->base->surface->events.commit, &v_commit);
+	v_destroy.notify = [](auto listener, auto data)
 	{
-		tinywl_popup* popup = wl_container_of(listener, popup, destroy);
-		delete popup;
+		t_popup* self = wl_container_of(listener, self, v_destroy);
+		delete self;
 	};
-	wl_signal_add(&xdg_popup->events.destroy, &destroy);
+	wl_signal_add(&v_popup->events.destroy, &v_destroy);
 }
 
-void tinywl_server::process_cursor_resize(uint32_t time)
+void t_server::f_process_cursor_resize(uint32_t a_time)
 {
-	double border_x = cursor->x - grab_x;
-	double border_y = cursor->y - grab_y;
-	int new_left = grab_geobox.x;
-	int new_right = grab_geobox.x + grab_geobox.width;
-	int new_top = grab_geobox.y;
-	int new_bottom = grab_geobox.y + grab_geobox.height;
-	if (resize_edges & WLR_EDGE_TOP) {
+	// TODO: wait a new client size.
+	double border_x = v_cursor->x - v_grab_x;
+	double border_y = v_cursor->y - v_grab_y;
+	int new_left = v_grab_geobox.x;
+	int new_right = v_grab_geobox.x + v_grab_geobox.width;
+	int new_top = v_grab_geobox.y;
+	int new_bottom = v_grab_geobox.y + v_grab_geobox.height;
+	if (v_resize_edges & WLR_EDGE_TOP) {
 		new_top = border_y;
 		if (new_top >= new_bottom) new_top = new_bottom - 1;
-	} else if (resize_edges & WLR_EDGE_BOTTOM) {
+	} else if (v_resize_edges & WLR_EDGE_BOTTOM) {
 		new_bottom = border_y;
 		if (new_bottom <= new_top) new_bottom = new_top + 1;
 	}
-	if (resize_edges & WLR_EDGE_LEFT) {
+	if (v_resize_edges & WLR_EDGE_LEFT) {
 		new_left = border_x;
 		if (new_left >= new_right) new_left = new_right - 1;
-	} else if (resize_edges & WLR_EDGE_RIGHT) {
+	} else if (v_resize_edges & WLR_EDGE_RIGHT) {
 		new_right = border_x;
 		if (new_right <= new_left) new_right = new_left + 1;
 	}
-	auto toplevel = grabbed_toplevel;
+	auto toplevel = v_grabbed_toplevel;
 	wlr_box geo_box;
-	wlr_xdg_surface_get_geometry(toplevel->xdg_toplevel->base, &geo_box);
-	wlr_scene_node_set_position(&toplevel->scene_tree->node, new_left - geo_box.x, new_top - geo_box.y);
+	wlr_xdg_surface_get_geometry(toplevel->v_toplevel->base, &geo_box);
+	wlr_scene_node_set_position(&toplevel->v_scene_tree->node, new_left - geo_box.x, new_top - geo_box.y);
 	int new_width = new_right - new_left;
 	int new_height = new_bottom - new_top;
-	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
+	wlr_xdg_toplevel_set_size(toplevel->v_toplevel, new_width, new_height);
 }
 
-void tinywl_server::process_cursor_motion(uint32_t time)
+void t_server::f_process_cursor_motion(uint32_t a_time)
 {
-	if (cursor_mode == TINYWL_CURSOR_MOVE) return wlr_scene_node_set_position(&grabbed_toplevel->scene_tree->node, cursor->x - grab_x, cursor->y - grab_y);
-	if (cursor_mode == TINYWL_CURSOR_RESIZE) return process_cursor_resize(time);
+	if (v_cursor_mode == c_CURSOR_MOVE) return wlr_scene_node_set_position(&v_grabbed_toplevel->v_scene_tree->node, v_cursor->x - v_grab_x, v_cursor->y - v_grab_y);
+	if (v_cursor_mode == c_CURSOR_RESIZE) return f_process_cursor_resize(a_time);
+	// TODO: grab the pointer during pressed.
 	wlr_surface* surface = NULL;
 	double sx, sy;
-	if (!desktop_toplevel_at(cursor->x, cursor->y, &surface, &sx, &sy)) wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
+	if (!f_desktop_toplevel_at(v_cursor->x, v_cursor->y, &surface, &sx, &sy)) wlr_cursor_set_xcursor(v_cursor, v_xcursor_manager, "default");
 	if (surface) {
-		wlr_seat_pointer_notify_enter(seat, surface, sx, sy);
-		wlr_seat_pointer_notify_motion(seat, time, sx, sy);
+		wlr_seat_pointer_notify_enter(v_seat, surface, sx, sy);
+		wlr_seat_pointer_notify_motion(v_seat, a_time, sx, sy);
 	} else {
-		wlr_seat_pointer_clear_focus(seat);
+		wlr_seat_pointer_clear_focus(v_seat);
 	}
 }
 
-tinywl_server::tinywl_server()
+t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loop(v_display), NULL))
 {
-	backend = wlr_backend_autocreate(wl_display_get_event_loop(wl_display), NULL);
-	if (!backend) throw std::runtime_error("failed to create wlr_backend");
-	renderer = wlr_renderer_autocreate(backend);
-	if (!renderer) throw std::runtime_error("failed to create wlr_renderer");
-	wlr_renderer_init_wl_display(renderer, wl_display);
-	allocator = wlr_allocator_autocreate(backend, renderer);
-	if (!allocator) throw std::runtime_error("failed to create wlr_allocator");
-	wlr_compositor_create(wl_display, 5, renderer);
-	wlr_subcompositor_create(wl_display);
-	wlr_data_device_manager_create(wl_display);
-	output_layout = wlr_output_layout_create(wl_display);
-	wl_list_init(&outputs);
-	new_output.notify = [](auto listener, auto data)
+	if (!v_backend) throw std::runtime_error("failed to create wlr_backend");
+	v_renderer = wlr_renderer_autocreate(v_backend);
+	if (!v_renderer) throw std::runtime_error("failed to create wlr_renderer");
+	wlr_renderer_init_wl_display(v_renderer, v_display);
+	v_allocator = wlr_allocator_autocreate(v_backend, v_renderer);
+	if (!v_allocator) throw std::runtime_error("failed to create wlr_allocator");
+	wlr_compositor_create(v_display, 5, v_renderer);
+	wlr_subcompositor_create(v_display);
+	wlr_data_device_manager_create(v_display);
+	v_output_layout = wlr_output_layout_create(v_display);
+	wl_list_init(&v_outputs);
+	v_new_output.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, new_output);
-		new tinywl_output(server, static_cast<struct wlr_output*>(data));
+		t_server* self = wl_container_of(listener, self, v_new_output);
+		new t_output(self, static_cast<wlr_output*>(data));
 	};
-	wl_signal_add(&backend->events.new_output, &new_output);
-	scene = wlr_scene_create();
-	scene_layout = wlr_scene_attach_output_layout(scene, output_layout);
-	wl_list_init(&toplevels);
-	xdg_shell = wlr_xdg_shell_create(wl_display, 3);
-	new_xdg_toplevel.notify = [](auto listener, auto data)
+	wl_signal_add(&v_backend->events.new_output, &v_new_output);
+	v_scene = wlr_scene_create();
+	v_scene_layout = wlr_scene_attach_output_layout(v_scene, v_output_layout);
+	wl_list_init(&v_toplevels);
+	v_xdg_shell = wlr_xdg_shell_create(v_display, 3);
+	v_new_xdg_toplevel.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, new_xdg_toplevel);
-		new tinywl_toplevel(server, static_cast<wlr_xdg_toplevel*>(data));
+		t_server* self = wl_container_of(listener, self, v_new_xdg_toplevel);
+		new t_toplevel(self, static_cast<wlr_xdg_toplevel*>(data));
 	};
-	wl_signal_add(&xdg_shell->events.new_toplevel, &new_xdg_toplevel);
-	new_xdg_popup.notify = [](auto listener, auto data)
+	wl_signal_add(&v_xdg_shell->events.new_toplevel, &v_new_xdg_toplevel);
+	v_new_xdg_popup.notify = [](auto listener, auto data)
 	{
-		new tinywl_popup(static_cast<wlr_xdg_popup*>(data));
+		new t_popup(static_cast<wlr_xdg_popup*>(data));
 	};
-	wl_signal_add(&xdg_shell->events.new_popup, &new_xdg_popup);
-	cursor = wlr_cursor_create();
-	wlr_cursor_attach_output_layout(cursor, output_layout);
-	cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
-	cursor_motion.notify = [](auto listener, auto data)
+	wl_signal_add(&v_xdg_shell->events.new_popup, &v_new_xdg_popup);
+	v_cursor = wlr_cursor_create();
+	wlr_cursor_attach_output_layout(v_cursor, v_output_layout);
+	v_xcursor_manager = wlr_xcursor_manager_create(NULL, 24);
+	v_cursor_motion.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, cursor_motion);
+		t_server* self = wl_container_of(listener, self, v_cursor_motion);
 		auto event = static_cast<wlr_pointer_motion_event*>(data);
-		wlr_cursor_move(server->cursor, &event->pointer->base, event->delta_x, event->delta_y);
-		server->process_cursor_motion(event->time_msec);
+		wlr_cursor_move(self->v_cursor, &event->pointer->base, event->delta_x, event->delta_y);
+		self->f_process_cursor_motion(event->time_msec);
 	};
-	wl_signal_add(&cursor->events.motion, &cursor_motion);
-	cursor_motion_absolute.notify = [](auto listener, auto data)
+	wl_signal_add(&v_cursor->events.motion, &v_cursor_motion);
+	v_cursor_motion_absolute.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, cursor_motion_absolute);
+		t_server* self = wl_container_of(listener, self, v_cursor_motion_absolute);
 		auto event = static_cast<wlr_pointer_motion_absolute_event*>(data);
-		wlr_cursor_warp_absolute(server->cursor, &event->pointer->base, event->x, event->y);
-		server->process_cursor_motion(event->time_msec);
+		wlr_cursor_warp_absolute(self->v_cursor, &event->pointer->base, event->x, event->y);
+		self->f_process_cursor_motion(event->time_msec);
 	};
-	wl_signal_add(&cursor->events.motion_absolute, &cursor_motion_absolute);
-	cursor_button.notify = [](auto listener, auto data)
+	wl_signal_add(&v_cursor->events.motion_absolute, &v_cursor_motion_absolute);
+	v_cursor_button.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, cursor_button);
+		t_server* self = wl_container_of(listener, self, v_cursor_button);
 		auto event = static_cast<wlr_pointer_button_event*>(data);
-		wlr_seat_pointer_notify_button(server->seat, event->time_msec, event->button, event->state);
-		if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) return server->reset_cursor_mode();
+		wlr_seat_pointer_notify_button(self->v_seat, event->time_msec, event->button, event->state);
+		if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) return self->f_reset_cursor_mode();
 		wlr_surface* surface;
 		double sx, sy;
-		if (auto p = server->desktop_toplevel_at(server->cursor->x, server->cursor->y, &surface, &sx, &sy)) p->focus(surface);
+		if (auto p = self->f_desktop_toplevel_at(self->v_cursor->x, self->v_cursor->y, &surface, &sx, &sy)) p->f_focus(surface);
 	};
-	wl_signal_add(&cursor->events.button, &cursor_button);
-	cursor_axis.notify = [](wl_listener* listener, void* data)
+	wl_signal_add(&v_cursor->events.button, &v_cursor_button);
+	v_cursor_axis.notify = [](wl_listener* listener, void* data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, cursor_axis);
+		t_server* self = wl_container_of(listener, self, v_cursor_axis);
 		auto event = static_cast<wlr_pointer_axis_event*>(data);
-		wlr_seat_pointer_notify_axis(server->seat, event->time_msec, event->orientation, event->delta, event->delta_discrete, event->source, event->relative_direction);
+		wlr_seat_pointer_notify_axis(self->v_seat, event->time_msec, event->orientation, event->delta, event->delta_discrete, event->source, event->relative_direction);
 	};
-	wl_signal_add(&cursor->events.axis, &cursor_axis);
-	cursor_frame.notify = [](auto listener, auto data)
+	wl_signal_add(&v_cursor->events.axis, &v_cursor_axis);
+	v_cursor_frame.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, cursor_frame);
-		wlr_seat_pointer_notify_frame(server->seat);
+		t_server* self = wl_container_of(listener, self, v_cursor_frame);
+		wlr_seat_pointer_notify_frame(self->v_seat);
 	};
-	wl_signal_add(&cursor->events.frame, &cursor_frame);
-	wl_list_init(&keyboards);
-	new_input.notify = [](auto listener, auto data)
+	wl_signal_add(&v_cursor->events.frame, &v_cursor_frame);
+	wl_list_init(&v_keyboards);
+	v_new_input.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, new_input);
+		t_server* self = wl_container_of(listener, self, v_new_input);
 		auto device = static_cast<wlr_input_device*>(data);
 		switch (device->type) {
 		case WLR_INPUT_DEVICE_KEYBOARD:
-			new tinywl_keyboard(server, device);
+			new t_keyboard(self, device);
 			break;
 		case WLR_INPUT_DEVICE_POINTER:
-			wlr_cursor_attach_input_device(server->cursor, device);
+			wlr_cursor_attach_input_device(self->v_cursor, device);
 			break;
 		}
 		uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
-		if (!wl_list_empty(&server->keyboards)) caps |= WL_SEAT_CAPABILITY_KEYBOARD;
-		wlr_seat_set_capabilities(server->seat, caps);
+		if (!wl_list_empty(&self->v_keyboards)) caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+		wlr_seat_set_capabilities(self->v_seat, caps);
 	};
-	wl_signal_add(&backend->events.new_input, &new_input);
-	seat = wlr_seat_create(wl_display, "seat0");
-	request_cursor.notify = [](auto listener, auto data)
+	wl_signal_add(&v_backend->events.new_input, &v_new_input);
+	v_seat = wlr_seat_create(v_display, "seat0");
+	v_request_cursor.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, request_cursor);
+		t_server* self = wl_container_of(listener, self, v_request_cursor);
 		auto event = static_cast<wlr_seat_pointer_request_set_cursor_event*>(data);
-		auto focused_client = server->seat->pointer_state.focused_client;
-		if (focused_client == event->seat_client) wlr_cursor_set_surface(server->cursor, event->surface, event->hotspot_x, event->hotspot_y);
+		auto focused_client = self->v_seat->pointer_state.focused_client;
+		if (focused_client == event->seat_client) wlr_cursor_set_surface(self->v_cursor, event->surface, event->hotspot_x, event->hotspot_y);
 	};
-	wl_signal_add(&seat->events.request_set_cursor, &request_cursor);
-	request_set_selection.notify = [](auto listener, auto data)
+	wl_signal_add(&v_seat->events.request_set_cursor, &v_request_cursor);
+	v_request_set_selection.notify = [](auto listener, auto data)
 	{
-		tinywl_server* server = wl_container_of(listener, server, request_set_selection);
+		t_server* self = wl_container_of(listener, self, v_request_set_selection);
 		auto event = static_cast<wlr_seat_request_set_selection_event*>(data);
-		wlr_seat_set_selection(server->seat, event->source, event->serial);
+		wlr_seat_set_selection(self->v_seat, event->source, event->serial);
 	};
-	wl_signal_add(&seat->events.request_set_selection, &request_set_selection);
-	input_method_manager = wlr_input_method_manager_v2_create(wl_display);
-	input_method_input_method.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_seat->events.request_set_selection, &v_request_set_selection);
+	v_input_method_manager = wlr_input_method_manager_v2_create(v_display);
+	v_input_method_input_method.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_server* server = wl_container_of(a_listener, server, input_method_input_method);
+		t_server* self = wl_container_of(a_listener, self, v_input_method_input_method);
 		auto input_method = static_cast<wlr_input_method_v2*>(a_data);
-		if (server->input_method)
+		if (self->v_input_method)
 			wlr_input_method_v2_send_unavailable(input_method);
 		else
-			new tinywl_input_method(server, input_method);
+			new t_input_method(self, input_method);
 	};
-	wl_signal_add(&input_method_manager->events.input_method, &input_method_input_method);
-	text_input_manager = wlr_text_input_manager_v3_create(wl_display);
-	text_input_text_input.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_input_method_manager->events.input_method, &v_input_method_input_method);
+	v_text_input_manager = wlr_text_input_manager_v3_create(v_display);
+	v_text_input_text_input.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_server* server = wl_container_of(a_listener, server, text_input_text_input);
-		new tinywl_text_input(server, static_cast<wlr_text_input_v3*>(a_data));
+		t_server* self = wl_container_of(a_listener, self, v_text_input_text_input);
+		new t_text_input(self, static_cast<wlr_text_input_v3*>(a_data));
 	};
-	wl_signal_add(&text_input_manager->events.text_input, &text_input_text_input);
-	keyboard_state_focus_change.notify = [](auto a_listener, auto a_data)
+	wl_signal_add(&v_text_input_manager->events.text_input, &v_text_input_text_input);
+	v_keyboard_state_focus_change.notify = [](auto a_listener, auto a_data)
 	{
-		tinywl_server* server = wl_container_of(a_listener, server, keyboard_state_focus_change);
+		t_server* self = wl_container_of(a_listener, self, v_keyboard_state_focus_change);
 		auto event = static_cast<wlr_seat_keyboard_focus_change_event*>(a_data);
 		wlr_text_input_v3* input;
-		if (event->old_surface) wl_list_for_each(input, &server->text_input_manager->text_inputs, link) {
+		if (event->old_surface) wl_list_for_each(input, &self->v_text_input_manager->text_inputs, link) {
 			if (input->focused_surface == event->old_surface) {
-				if (auto p = server->input_method; p && p->on) p->deactivate();
+				if (auto p = self->v_input_method; p && p->v_on) p->f_deactivate();
 				wlr_text_input_v3_send_leave(input);
 			}
 		}
-		if (event->new_surface) wl_list_for_each(input, &server->text_input_manager->text_inputs, link) {
+		if (event->new_surface) wl_list_for_each(input, &self->v_text_input_manager->text_inputs, link) {
 			if (input->seat == event->seat && wl_resource_get_client(input->resource) == wl_resource_get_client(event->new_surface->resource)) wlr_text_input_v3_send_enter(input, event->new_surface);
 		}
 	};
-	wl_signal_add(&seat->keyboard_state.events.focus_change, &keyboard_state_focus_change);
+	wl_signal_add(&v_seat->keyboard_state.events.focus_change, &v_keyboard_state_focus_change);
 }
 
 int main(int argc, char* argv[])
@@ -853,13 +807,13 @@ int main(int argc, char* argv[])
 		printf("Usage: %s [-s startup command]\n", argv[0]);
 		return 0;
 	}
-	tinywl_server server;
-	auto socket = wl_display_add_socket_auto(server.wl_display);
+	t_server server;
+	auto socket = wl_display_add_socket_auto(server.v_display);
 	if (!socket) return 1;
-	if (!wlr_backend_start(server.backend)) return 1;
+	if (!wlr_backend_start(server.v_backend)) return 1;
 	setenv("WAYLAND_DISPLAY", socket, true);
 	if (startup_cmd && fork() == 0) execl("/bin/sh", "/bin/sh", "-c", startup_cmd, (void*)NULL);
 	wlr_log(WLR_INFO, "Running Wayland compositor on WAYLAND_DISPLAY=%s", socket);
-	wl_display_run(server.wl_display);
+	wl_display_run(server.v_display);
 	return 0;
 }
