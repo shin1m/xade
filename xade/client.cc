@@ -417,9 +417,9 @@ zwp_text_input_v3_listener t_input::v_zwp_text_input_v3_listener = {
 	[](auto a_data, auto a_this, auto a_surface)
 	{
 		if (!f_client().v_input_focus) return;
-		f_client().v_input_focus = nullptr;
 		auto focus = static_cast<t_surface*>(wl_surface_get_user_data(a_surface));
 		if (auto& p = focus->f_input()) p->f_disable();
+		f_client().v_input_focus = nullptr;
 	},
 	[](auto a_data, auto a_this, auto a_text, auto a_begin, auto a_end)
 	{
