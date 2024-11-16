@@ -75,8 +75,9 @@ struct t_server
 	wl_listener v_request_cursor;
 	wl_listener v_request_set_selection;
 	wl_list v_keyboards;
+	wlr_scene_surface* v_grabbed_surface = NULL;
 	t_cursor_mode v_cursor_mode = c_CURSOR_PASSTHROUGH;
-	t_toplevel* v_grabbed_toplevel;
+	t_toplevel* v_grabbed_toplevel = nullptr;
 	double v_grab_x, v_grab_y;
 	wlr_box v_grab_geobox;
 	uint32_t v_resize_edges;
@@ -105,17 +106,26 @@ struct t_server
 		wlr_backend_destroy(v_backend);
 		wl_display_destroy(v_display);
 	}
-	t_toplevel* f_desktop_toplevel_at(double a_lx, double a_ly, wlr_surface** a_surface, double* a_sx, double* a_sy)
+	wlr_scene_surface* f_surface_at_cursor(double* a_sx, double* a_sy)
 	{
-		auto node = wlr_scene_node_at(&v_scene->tree.node, a_lx, a_ly, a_sx, a_sy);
-		if (!node || node->type != WLR_SCENE_NODE_BUFFER) return nullptr;
-		auto scene_buffer = wlr_scene_buffer_from_node(node);
-		auto scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
-		if (!scene_surface) return nullptr;
-		*a_surface = scene_surface->surface;
-		auto tree = node->parent;
+		auto node = wlr_scene_node_at(&v_scene->tree.node, v_cursor->x, v_cursor->y, a_sx, a_sy);
+		return node && node->type == WLR_SCENE_NODE_BUFFER ? wlr_scene_surface_try_from_buffer(wlr_scene_buffer_from_node(node)) : nullptr;
+	}
+	t_toplevel* f_toplevel(wlr_scene_surface* a_surface)
+	{
+		if (!a_surface) return nullptr;
+		auto tree = a_surface->buffer->node.parent;
 		while (tree && !tree->node.data) tree = tree->node.parent;
 		return tree ? static_cast<t_toplevel*>(tree->node.data) : nullptr;
+	}
+	void f_ungrab_pointer()
+	{
+		v_grabbed_surface = NULL;
+		double sx, sy;
+		if (auto surface = f_surface_at_cursor(&sx, &sy))
+			wlr_seat_pointer_notify_enter(v_seat, surface->surface, sx, sy);
+		else
+			wlr_seat_pointer_clear_focus(v_seat);
 	}
 	void f_reset_cursor_mode()
 	{
@@ -124,6 +134,7 @@ struct t_server
 	}
 	void f_process_cursor_resize(uint32_t a_time);
 	void f_process_cursor_motion(uint32_t a_time);
+	void f_blur_text_input();
 };
 
 struct t_output
@@ -158,12 +169,11 @@ struct t_toplevel
 	wl_listener v_request_fullscreen;
 
 	t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel);
-	// TODO: need a_surface?
-	void f_focus(wlr_surface* a_surface)
+	void f_focus()
 	{
 		auto seat = v_server->v_seat;
 		auto current = seat->keyboard_state.focused_surface;
-		if (current == a_surface) return;
+		if (current == v_toplevel->base->surface) return;
 		if (current) if (auto p = wlr_xdg_toplevel_try_from_wlr_surface(current)) wlr_xdg_toplevel_set_activated(p, false);
 		wlr_scene_node_raise_to_top(&v_scene_tree->node);
 		wl_list_remove(&v_link);
@@ -268,27 +278,27 @@ struct t_text_input
 		v_enable.notify = [](auto a_listener, auto a_data)
 		{
 			t_text_input* self = wl_container_of(a_listener, self, v_enable);
-			self->v_server->v_focused_text_input = self;
-			if (auto p = self->v_server->v_input_method; p && p->v_on) {
-				wlr_input_method_v2_send_activate(*p);
-				self->f_send();
-			}
-			wlr_text_input_v3_send_done(self->v_text_input);
+			if (self->v_text_input->focused_surface) self->f_focus();
+			wlr_text_input_v3_send_done(*self);
 		};
 		wl_signal_add(&v_text_input->events.enable, &v_enable);
 		v_commit.notify = [](auto a_listener, auto a_data)
 		{
 			t_text_input* self = wl_container_of(a_listener, self, v_commit);
-			if (auto p = self->v_server->v_input_method; p && p->v_on) self->f_send();
-			wlr_text_input_v3_send_done(self->v_text_input);
+			if (self->v_text_input->focused_surface && self->v_text_input->current_enabled) {
+				if (!self->v_server->v_focused_text_input)
+					self->f_focus();
+				else if (auto p = self->v_server->v_input_method; p && p->v_on)
+					self->f_send();
+			}
+			wlr_text_input_v3_send_done(*self);
 		};
 		wl_signal_add(&v_text_input->events.commit, &v_commit);
 		v_disable.notify = [](auto a_listener, auto a_data)
 		{
 			t_text_input* self = wl_container_of(a_listener, self, v_disable);
-			if (auto p = self->v_server->v_input_method; p && p->v_on) p->f_deactivate();
-			self->v_server->v_focused_text_input = nullptr;
-			wlr_text_input_v3_send_done(self->v_text_input);
+			if (self->v_server->v_focused_text_input == self) self->v_server->f_blur_text_input();
+			wlr_text_input_v3_send_done(*self);
 		};
 		wl_signal_add(&v_text_input->events.disable, &v_disable);
 		v_destroy.notify = [](auto a_listener, auto a_data)
@@ -300,8 +310,7 @@ struct t_text_input
 	}
 	~t_text_input()
 	{
-		if (auto p = v_server->v_input_method; p && p->v_on) p->f_deactivate();
-		if (v_server->v_focused_text_input == this) v_server->v_focused_text_input = nullptr;
+		if (v_server->v_focused_text_input == this) v_server->f_blur_text_input();
 	}
 	operator wlr_text_input_v3*() const
 	{
@@ -319,6 +328,14 @@ struct t_text_input
 		wlr_input_method_v2_send_done(*p);
 		wlr_input_popup_surface_v2* popup;
 		wl_list_for_each(popup, &p->v_input_method->popup_surfaces, link) if (popup->surface->data) static_cast<t_input_popup*>(popup->data)->f_move(v_text_input);
+	}
+	void f_focus()
+	{
+		v_server->v_focused_text_input = this;
+		if (auto p = v_server->v_input_method; p && p->v_on) {
+			wlr_input_method_v2_send_activate(*p);
+			f_send();
+		}
 	}
 };
 
@@ -359,14 +376,14 @@ t_input_popup::t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_p
 	v_commit.notify = [](auto a_listener, auto a_data)
 	{
 		t_input_popup* self = wl_container_of(a_listener, self, v_commit);
-		if (self->v_popup->surface->data) self->f_move(self->v_server->v_focused_text_input->v_text_input);
+		if (self->v_popup->surface->data) self->f_move(*self->v_server->v_focused_text_input);
 	};
 	wl_signal_add(&v_popup->surface->events.commit, &v_commit);
 	v_map.notify = [](auto a_listener, auto a_data)
 	{
 		t_input_popup* self = wl_container_of(a_listener, self, v_map);
 		self->v_popup->surface->data = wlr_scene_surface_create(&self->v_server->v_scene->tree, self->v_popup->surface);
-		self->f_move(self->v_server->v_focused_text_input->v_text_input);
+		self->f_move(*self->v_server->v_focused_text_input);
 	};
 	wl_signal_add(&v_popup->surface->events.map, &v_map);
 	v_unmap.notify = [](auto a_listener, auto a_data)
@@ -419,7 +436,7 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 				case XKB_KEY_F1:
 					if (wl_list_length(&server->v_toplevels) > 1) {
 						t_toplevel* p = wl_container_of(server->v_toplevels.prev, p, v_link);
-						p->f_focus(p->v_toplevel->base->surface);
+						p->f_focus();
 					}
 					return;
 				}
@@ -504,12 +521,13 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	{
 		t_toplevel* self = wl_container_of(listener, self, v_map);
 		wl_list_insert(&self->v_server->v_toplevels, &self->v_link);
-		self->f_focus(self->v_toplevel->base->surface);
+		self->f_focus();
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.map, &v_map);
 	v_unmap.notify = [](auto listener, auto data)
 	{
 		t_toplevel* self = wl_container_of(listener, self, v_unmap);
+		if (self->v_server->v_grabbed_surface && self->v_toplevel->base->surface == self->v_server->v_grabbed_surface->surface) self->v_server->f_ungrab_pointer();
 		if (self == self->v_server->v_grabbed_toplevel) self->v_server->f_reset_cursor_mode();
 		wl_list_remove(&self->v_link);
 	};
@@ -630,12 +648,17 @@ void t_server::f_process_cursor_motion(uint32_t a_time)
 {
 	if (v_cursor_mode == c_CURSOR_MOVE) return wlr_scene_node_set_position(&v_grabbed_toplevel->v_scene_tree->node, v_cursor->x - v_grab_x, v_cursor->y - v_grab_y);
 	if (v_cursor_mode == c_CURSOR_RESIZE) return f_process_cursor_resize(a_time);
-	// TODO: grab the pointer during pressed.
-	wlr_surface* surface = NULL;
+	if (v_grabbed_surface) {
+		int x, y;
+		wlr_scene_node_coords(&v_grabbed_surface->buffer->node, &x, &y);
+		wlr_seat_pointer_notify_motion(v_seat, a_time, v_cursor->x - x, v_cursor->y - y);
+		return;
+	}
 	double sx, sy;
-	if (!f_desktop_toplevel_at(v_cursor->x, v_cursor->y, &surface, &sx, &sy)) wlr_cursor_set_xcursor(v_cursor, v_xcursor_manager, "default");
+	auto surface = f_surface_at_cursor(&sx, &sy);
+	if (!f_toplevel(surface)) wlr_cursor_set_xcursor(v_cursor, v_xcursor_manager, "default");
 	if (surface) {
-		wlr_seat_pointer_notify_enter(v_seat, surface, sx, sy);
+		wlr_seat_pointer_notify_enter(v_seat, surface->surface, sx, sy);
 		wlr_seat_pointer_notify_motion(v_seat, a_time, sx, sy);
 	} else {
 		wlr_seat_pointer_clear_focus(v_seat);
@@ -700,10 +723,19 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		t_server* self = wl_container_of(listener, self, v_cursor_button);
 		auto event = static_cast<wlr_pointer_button_event*>(data);
 		wlr_seat_pointer_notify_button(self->v_seat, event->time_msec, event->button, event->state);
-		if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) return self->f_reset_cursor_mode();
-		wlr_surface* surface;
-		double sx, sy;
-		if (auto p = self->f_desktop_toplevel_at(self->v_cursor->x, self->v_cursor->y, &surface, &sx, &sy)) p->f_focus(surface);
+		if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
+			if (self->v_grabbed_surface) self->f_ungrab_pointer();
+			self->f_reset_cursor_mode();
+		} else if (!self->v_grabbed_surface) {
+			auto surface = self->f_surface_at_cursor(NULL, NULL);
+			self->v_grabbed_surface = surface;
+			if (auto p = self->f_toplevel(surface)) {
+				p->f_focus();
+			} else {
+				if (auto p = self->v_seat->keyboard_state.focused_surface) if (auto q = wlr_xdg_toplevel_try_from_wlr_surface(p)) wlr_xdg_toplevel_set_activated(q, false);
+				wlr_seat_keyboard_notify_clear_focus(self->v_seat);
+			}
+		}
 	};
 	wl_signal_add(&v_cursor->events.button, &v_cursor_button);
 	v_cursor_axis.notify = [](wl_listener* listener, void* data)
@@ -778,7 +810,7 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		wlr_text_input_v3* input;
 		if (event->old_surface) wl_list_for_each(input, &self->v_text_input_manager->text_inputs, link) {
 			if (input->focused_surface == event->old_surface) {
-				if (auto p = self->v_input_method; p && p->v_on) p->f_deactivate();
+				self->f_blur_text_input();
 				wlr_text_input_v3_send_leave(input);
 			}
 		}
@@ -787,6 +819,12 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		}
 	};
 	wl_signal_add(&v_seat->keyboard_state.events.focus_change, &v_keyboard_state_focus_change);
+}
+
+void t_server::f_blur_text_input()
+{
+	if (auto p = v_input_method; p && p->v_on) p->f_deactivate();
+	v_focused_text_input = nullptr;
 }
 
 int main(int argc, char* argv[])

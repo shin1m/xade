@@ -321,7 +321,11 @@ void t_surface::f_destroy()
 void t_surface::f_input__(const std::shared_ptr<t_input>& a_input)
 {
 	if (a_input == v_input) return;
-	if (v_input && this == f_client().f_input_focus()) v_input->f_disable();
+	if (v_input && this == f_client().f_input_focus()) {
+		v_input->f_disable();
+		zwp_text_input_v3_disable(*v_input);
+		v_input->f_commit();
+	}
 	v_input = a_input;
 	if (v_input && this == f_client().f_input_focus()) v_input->f_enable();
 }
@@ -453,8 +457,6 @@ void t_input::f_disable()
 {
 	f_reset();
 	if (auto& on = f_client().v_input_focus->v_on_input_disable) on();
-	zwp_text_input_v3_disable(v_input);
-	f_commit();
 }
 
 }
