@@ -333,8 +333,9 @@ void t_surface::f_input__(const std::shared_ptr<t_input>& a_input)
 xdg_surface_listener t_frame::v_xdg_surface_listener = {
 	[](auto a_data, auto a_this, auto a_serial)
 	{
-		xdg_surface_ack_configure(a_this, a_serial);
 		auto& self = *static_cast<t_frame*>(a_data);
+		self.v_configuring = true;
+		self.v_configure_serial = a_serial;
 		if (!self.f_is(XDG_TOPLEVEL_STATE_MAXIMIZED) && !self.f_is(XDG_TOPLEVEL_STATE_FULLSCREEN)) {
 			if (self.v_width <= 0) self.v_width = self.v_restore_width;
 			if (self.v_height <= 0) self.v_height = self.v_restore_height;
@@ -371,18 +372,26 @@ xdg_toplevel_listener t_frame::v_xdg_toplevel_listener = {
 
 void t_frame::f_resize()
 {
+	auto ack = [&]
+	{
+		if (!v_configuring) return;
+		v_configuring = false;
+		xdg_surface_ack_configure(v_xdg_surface, v_configure_serial);
+		wl_surface_commit(*this);
+	};
 	bool map = !static_cast<wl_egl_window*>(*this);
 	if (map) {
-		if (v_width <= 0 || v_height <= 0) return;
+		if (v_width <= 0 || v_height <= 0) return ack();
 		f_create(v_width, v_height);
 	} else {
 		int width;
 		int height;
 		wl_egl_window_get_attached_size(*this, &width, &height);
-		if (v_width == width && v_height == height) return;
+		if (v_width == width && v_height == height) return ack();
 		if (v_width <= 0 || v_height <= 0) {
 			if (auto& on = v_on_unmap) on();
-			return f_destroy();
+			f_destroy();
+			return ack();
 		}
 		wl_egl_window_resize(*this, v_width, v_height, 0, 0);
 		if (f_is(XDG_TOPLEVEL_STATE_MAXIMIZED)) map = true;

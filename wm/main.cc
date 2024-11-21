@@ -163,10 +163,14 @@ struct t_toplevel
 	wl_listener v_unmap;
 	wl_listener v_commit;
 	wl_listener v_destroy;
+	wl_listener v_ack_configure;
 	wl_listener v_request_move;
 	wl_listener v_request_resize;
 	wl_listener v_request_maximize;
 	wl_listener v_request_fullscreen;
+	uint32_t v_resize_edges = 0;
+	uint32_t v_resize_serial;
+	uint32_t v_move_edges = 0;
 
 	t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel);
 	void f_focus()
@@ -536,6 +540,13 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_commit);
 		if (self->v_toplevel->base->initial_commit) wlr_xdg_toplevel_set_size(self->v_toplevel, 0, 0);
+		if (auto edges = self->v_move_edges) {
+			self->v_move_edges = 0;
+			wlr_box box;
+			wlr_xdg_surface_get_geometry(self->v_toplevel->base, &box);
+			auto& grab = self->v_server->v_grab_geobox;
+			wlr_scene_node_set_position(&self->v_scene_tree->node, edges & WLR_EDGE_LEFT ? grab.x + grab.width - box.width : grab.x, edges & WLR_EDGE_TOP ? grab.y + grab.height - box.height : grab.y);
+		}
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.commit, &v_commit);
 	v_destroy.notify = [](auto a_listener, auto a_data)
@@ -544,12 +555,20 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		delete self;
 	};
 	wl_signal_add(&v_toplevel->events.destroy, &v_destroy);
+	v_ack_configure.notify = [](auto a_listener, auto a_data)
+	{
+		t_toplevel* self = wl_container_of(a_listener, self, v_ack_configure);
+		if (self->v_resize_edges) {
+			self->v_move_edges = self->v_resize_edges;
+			if (static_cast<wlr_xdg_surface_configure*>(a_data)->serial >= self->v_resize_serial) self->v_resize_edges = 0;
+		}
+	};
+	wl_signal_add(&v_toplevel->base->events.ack_configure, &v_ack_configure);
 	v_request_move.notify = [](auto a_listener, auto a_data)
 	{
 		// TODO: check the serial.
 		t_toplevel* self = wl_container_of(a_listener, self, v_request_move);
 		auto server = self->v_server;
-		if (self->v_toplevel->base->surface != wlr_surface_get_root_surface(server->v_seat->pointer_state.focused_surface)) return;
 		server->v_grabbed_toplevel = self;
 		server->v_cursor_mode = c_CURSOR_MOVE;
 		server->v_grab_x = server->v_cursor->x - self->v_scene_tree->node.x;
@@ -561,19 +580,17 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		// TODO: check the serial.
 		t_toplevel* self = wl_container_of(a_listener, self, v_request_resize);
 		auto server = self->v_server;
-		if (self->v_toplevel->base->surface != wlr_surface_get_root_surface(server->v_seat->pointer_state.focused_surface)) return;
 		server->v_grabbed_toplevel = self;
 		server->v_cursor_mode = c_CURSOR_RESIZE;
-		wlr_box geo_box;
-		wlr_xdg_surface_get_geometry(self->v_toplevel->base, &geo_box);
+		wlr_box box;
+		wlr_xdg_surface_get_geometry(self->v_toplevel->base, &box);
 		auto edges = static_cast<wlr_xdg_toplevel_resize_event*>(a_data)->edges;
-		double border_x = (self->v_scene_tree->node.x + geo_box.x) + ((edges & WLR_EDGE_RIGHT) ? geo_box.width : 0);
-		double border_y = (self->v_scene_tree->node.y + geo_box.y) + ((edges & WLR_EDGE_BOTTOM) ? geo_box.height : 0);
-		server->v_grab_x = server->v_cursor->x - border_x;
-		server->v_grab_y = server->v_cursor->y - border_y;
-		server->v_grab_geobox = geo_box;
-		server->v_grab_geobox.x += self->v_scene_tree->node.x;
-		server->v_grab_geobox.y += self->v_scene_tree->node.y;
+		auto& node = self->v_scene_tree->node;
+		server->v_grab_x = server->v_cursor->x - (node.x + box.x + (edges & WLR_EDGE_RIGHT ? box.width : 0));
+		server->v_grab_y = server->v_cursor->y - (node.y + box.y + (edges & WLR_EDGE_BOTTOM ? box.height : 0));
+		server->v_grab_geobox = box;
+		server->v_grab_geobox.x += node.x;
+		server->v_grab_geobox.y += node.y;
 		server->v_resize_edges = edges;
 	};
 	wl_signal_add(&v_toplevel->events.request_resize, &v_request_resize);
@@ -614,34 +631,28 @@ t_popup::t_popup(wlr_xdg_popup* a_popup) : v_popup(a_popup)
 
 void t_server::f_process_cursor_resize(uint32_t a_time)
 {
-	// TODO: wait a new client size.
-	double border_x = v_cursor->x - v_grab_x;
-	double border_y = v_cursor->y - v_grab_y;
-	int new_left = v_grab_geobox.x;
-	int new_right = v_grab_geobox.x + v_grab_geobox.width;
-	int new_top = v_grab_geobox.y;
-	int new_bottom = v_grab_geobox.y + v_grab_geobox.height;
-	if (v_resize_edges & WLR_EDGE_TOP) {
-		new_top = border_y;
-		if (new_top >= new_bottom) new_top = new_bottom - 1;
-	} else if (v_resize_edges & WLR_EDGE_BOTTOM) {
-		new_bottom = border_y;
-		if (new_bottom <= new_top) new_bottom = new_top + 1;
-	}
+	double x = v_cursor->x - v_grab_x;
+	int left = v_grab_geobox.x;
+	int right = v_grab_geobox.x + v_grab_geobox.width;
 	if (v_resize_edges & WLR_EDGE_LEFT) {
-		new_left = border_x;
-		if (new_left >= new_right) new_left = new_right - 1;
+		left = x;
+		if (left >= right) left = right - 1;
 	} else if (v_resize_edges & WLR_EDGE_RIGHT) {
-		new_right = border_x;
-		if (new_right <= new_left) new_right = new_left + 1;
+		right = x;
+		if (right <= left) right = left + 1;
 	}
-	auto toplevel = v_grabbed_toplevel;
-	wlr_box geo_box;
-	wlr_xdg_surface_get_geometry(toplevel->v_toplevel->base, &geo_box);
-	wlr_scene_node_set_position(&toplevel->v_scene_tree->node, new_left - geo_box.x, new_top - geo_box.y);
-	int new_width = new_right - new_left;
-	int new_height = new_bottom - new_top;
-	wlr_xdg_toplevel_set_size(toplevel->v_toplevel, new_width, new_height);
+	double y = v_cursor->y - v_grab_y;
+	int top = v_grab_geobox.y;
+	int bottom = v_grab_geobox.y + v_grab_geobox.height;
+	if (v_resize_edges & WLR_EDGE_TOP) {
+		top = y;
+		if (top >= bottom) top = bottom - 1;
+	} else if (v_resize_edges & WLR_EDGE_BOTTOM) {
+		bottom = y;
+		if (bottom <= top) bottom = top + 1;
+	}
+	v_grabbed_toplevel->v_resize_edges = v_resize_edges;
+	v_grabbed_toplevel->v_resize_serial = wlr_xdg_toplevel_set_size(v_grabbed_toplevel->v_toplevel, right - left, bottom - top);
 }
 
 void t_server::f_process_cursor_motion(uint32_t a_time)

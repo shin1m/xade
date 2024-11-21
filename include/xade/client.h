@@ -246,6 +246,8 @@ class t_frame : public t_surface
 	int32_t v_restore_height = 0;
 	uint16_t v_states = 0;
 	uint16_t v_capabilities = 0;
+	bool v_configuring = false;
+	uint32_t v_configure_serial;
 
 	void f_resize();
 
@@ -260,6 +262,14 @@ public:
 	operator xdg_toplevel*() const
 	{
 		return v_xdg_toplevel;
+	}
+	void f_swap_buffers()
+	{
+		if (v_configuring) {
+			v_configuring = false;
+			xdg_surface_ack_configure(v_xdg_surface, v_configure_serial);
+		}
+		t_surface::f_swap_buffers();
 	}
 	bool f_is(xdg_toplevel_state a_state) const
 	{
@@ -286,12 +296,13 @@ public:
 	}
 	void f_resize(int32_t a_width, int32_t a_height)
 	{
+		if (a_width > 0 && a_height > 0) {
+			v_restore_width = a_width;
+			v_restore_height = a_height;
+		}
+		if (f_is(XDG_TOPLEVEL_STATE_MAXIMIZED) || f_is(XDG_TOPLEVEL_STATE_FULLSCREEN)) return;
 		v_width = a_width;
 		v_height = a_height;
-		if (v_width > 0 && v_height > 0 && !f_is(XDG_TOPLEVEL_STATE_MAXIMIZED) && !f_is(XDG_TOPLEVEL_STATE_FULLSCREEN)) {
-			v_restore_width = v_width;
-			v_restore_height = v_height;
-		}
 		f_resize();
 	}
 };
