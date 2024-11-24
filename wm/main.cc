@@ -1,11 +1,9 @@
+#include <functional>
 #include <stdexcept>
 #include <string>
-#include <assert.h>
-#include <getopt.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
+#include <cassert>
+#include <cstdlib>
+#include <cstdio>
 #include <unistd.h>
 #include <wayland-server-core.h>
 extern "C"
@@ -35,14 +33,6 @@ extern "C"
 #include <wlr/util/log.h>
 }
 #include <xkbcommon/xkbcommon.h>
-
-/* For brevity's sake, struct members are annotated where they are used. */
-enum t_cursor_mode
-{
-	c_CURSOR_PASSTHROUGH,
-	c_CURSOR_MOVE,
-	c_CURSOR_RESIZE
-};
 
 struct t_toplevel;
 struct t_input_method;
@@ -75,12 +65,22 @@ struct t_server
 	wl_listener v_request_cursor;
 	wl_listener v_request_set_selection;
 	wl_list v_keyboards;
-	wlr_scene_surface* v_grabbed_surface = NULL;
-	t_cursor_mode v_cursor_mode = c_CURSOR_PASSTHROUGH;
-	t_toplevel* v_grabbed_toplevel = nullptr;
-	double v_grab_x, v_grab_y;
-	wlr_box v_grab_geobox;
-	uint32_t v_resize_edges;
+	static void f_on_unmap_none(wlr_xdg_surface* a_surface)
+	{
+	}
+	std::function<void(wlr_xdg_surface*)> v_on_unmap = f_on_unmap_none;
+	void f_on_unmap_ungrab(wlr_surface* a_surface)
+	{
+		v_on_unmap = [&, a_surface](auto a_unmapped)
+		{
+			if (a_unmapped->surface == a_surface) f_ungrab_pointer();
+		};
+	}
+	std::function<void(uint32_t)> v_on_cursor_motion;
+	std::function<void(uint32_t)> v_on_cursor_motion_forward;
+	std::function<void(wl_pointer_button_state)> v_on_cursor_button;
+	std::function<void(wl_pointer_button_state)> v_on_cursor_button_grab;
+	std::function<void(wl_pointer_button_state)> v_on_cursor_button_ungrab;
 
 	wlr_output_layout* v_output_layout;
 	wl_list v_outputs;
@@ -118,22 +118,25 @@ struct t_server
 		while (tree && !tree->node.data) tree = tree->node.parent;
 		return tree ? static_cast<t_toplevel*>(tree->node.data) : nullptr;
 	}
+	void f_pointer_motion(uint32_t* a_time)
+	{
+		double sx, sy;
+		auto surface = f_surface_at_cursor(&sx, &sy);
+		if (!f_toplevel(surface)) wlr_cursor_set_xcursor(v_cursor, v_xcursor_manager, "default");
+		if (surface) {
+			wlr_seat_pointer_notify_enter(v_seat, surface->surface, sx, sy);
+			if (a_time) wlr_seat_pointer_notify_motion(v_seat, *a_time, sx, sy);
+		} else {
+			wlr_seat_pointer_clear_focus(v_seat);
+		}
+	};
 	void f_ungrab_pointer()
 	{
-		v_grabbed_surface = NULL;
-		double sx, sy;
-		if (auto surface = f_surface_at_cursor(&sx, &sy))
-			wlr_seat_pointer_notify_enter(v_seat, surface->surface, sx, sy);
-		else
-			wlr_seat_pointer_clear_focus(v_seat);
+		v_on_unmap = f_on_unmap_none;
+		v_on_cursor_motion = v_on_cursor_motion_forward;
+		v_on_cursor_button = v_on_cursor_button_grab;
+		f_pointer_motion(nullptr);
 	}
-	void f_reset_cursor_mode()
-	{
-		v_cursor_mode = c_CURSOR_PASSTHROUGH;
-		v_grabbed_toplevel = nullptr;
-	}
-	void f_process_cursor_resize(uint32_t a_time);
-	void f_process_cursor_motion(uint32_t a_time);
 	void f_blur_text_input();
 };
 
@@ -168,9 +171,14 @@ struct t_toplevel
 	wl_listener v_request_resize;
 	wl_listener v_request_maximize;
 	wl_listener v_request_fullscreen;
-	uint32_t v_resize_edges = 0;
-	uint32_t v_resize_serial;
-	uint32_t v_move_edges = 0;
+	static void f_on_commit_none()
+	{
+	};
+	std::function<void()> v_on_commit = f_on_commit_none;
+	static void f_on_ack_configure_none(uint32_t a_serial)
+	{
+	};
+	std::function<void(uint32_t)> v_on_ack_configure = f_on_ack_configure_none;
 
 	t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel);
 	void f_focus()
@@ -189,11 +197,12 @@ struct t_toplevel
 
 struct t_popup
 {
+	t_server* v_server;
 	wlr_xdg_popup* v_popup;
 	wl_listener v_commit;
 	wl_listener v_destroy;
 
-	t_popup(wlr_xdg_popup* a_popup);
+	t_popup(t_server* a_server, wlr_xdg_popup* a_popup);
 };
 
 struct t_keyboard
@@ -531,8 +540,7 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	v_unmap.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_unmap);
-		if (self->v_server->v_grabbed_surface && self->v_toplevel->base->surface == self->v_server->v_grabbed_surface->surface) self->v_server->f_ungrab_pointer();
-		if (self == self->v_server->v_grabbed_toplevel) self->v_server->f_reset_cursor_mode();
+		self->v_server->v_on_unmap(self->v_toplevel->base);
 		wl_list_remove(&self->v_link);
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.unmap, &v_unmap);
@@ -540,13 +548,7 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_commit);
 		if (self->v_toplevel->base->initial_commit) wlr_xdg_toplevel_set_size(self->v_toplevel, 0, 0);
-		if (auto edges = self->v_move_edges) {
-			self->v_move_edges = 0;
-			wlr_box box;
-			wlr_xdg_surface_get_geometry(self->v_toplevel->base, &box);
-			auto& grab = self->v_server->v_grab_geobox;
-			wlr_scene_node_set_position(&self->v_scene_tree->node, edges & WLR_EDGE_LEFT ? grab.x + grab.width - box.width : grab.x, edges & WLR_EDGE_TOP ? grab.y + grab.height - box.height : grab.y);
-		}
+		self->v_on_commit();
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.commit, &v_commit);
 	v_destroy.notify = [](auto a_listener, auto a_data)
@@ -558,10 +560,7 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	v_ack_configure.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_ack_configure);
-		if (self->v_resize_edges) {
-			self->v_move_edges = self->v_resize_edges;
-			if (static_cast<wlr_xdg_surface_configure*>(a_data)->serial >= self->v_resize_serial) self->v_resize_edges = 0;
-		}
+		self->v_on_ack_configure(static_cast<wlr_xdg_surface_configure*>(a_data)->serial);
 	};
 	wl_signal_add(&v_toplevel->base->events.ack_configure, &v_ack_configure);
 	v_request_move.notify = [](auto a_listener, auto a_data)
@@ -569,10 +568,14 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		// TODO: check the serial.
 		t_toplevel* self = wl_container_of(a_listener, self, v_request_move);
 		auto server = self->v_server;
-		server->v_grabbed_toplevel = self;
-		server->v_cursor_mode = c_CURSOR_MOVE;
-		server->v_grab_x = server->v_cursor->x - self->v_scene_tree->node.x;
-		server->v_grab_y = server->v_cursor->y - self->v_scene_tree->node.y;
+		server->f_on_unmap_ungrab(self->v_toplevel->base->surface);
+		auto& node = self->v_scene_tree->node;
+		auto cursor = server->v_cursor;
+		server->v_on_cursor_motion = [&node, cursor, x = node.x - cursor->x, y = node.y - cursor->y](auto a_time)
+		{
+			wlr_scene_node_set_position(&node, x + cursor->x, y + cursor->y);
+		};
+		server->v_on_cursor_button = server->v_on_cursor_button_ungrab;
 	};
 	wl_signal_add(&v_toplevel->events.request_move, &v_request_move);
 	v_request_resize.notify = [](auto a_listener, auto a_data)
@@ -580,18 +583,37 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		// TODO: check the serial.
 		t_toplevel* self = wl_container_of(a_listener, self, v_request_resize);
 		auto server = self->v_server;
-		server->v_grabbed_toplevel = self;
-		server->v_cursor_mode = c_CURSOR_RESIZE;
+		server->f_on_unmap_ungrab(self->v_toplevel->base->surface);
 		wlr_box box;
 		wlr_xdg_surface_get_geometry(self->v_toplevel->base, &box);
+		box.x += self->v_scene_tree->node.x;
+		box.y += self->v_scene_tree->node.y;
 		auto edges = static_cast<wlr_xdg_toplevel_resize_event*>(a_data)->edges;
-		auto& node = self->v_scene_tree->node;
-		server->v_grab_x = server->v_cursor->x - (node.x + box.x + (edges & WLR_EDGE_RIGHT ? box.width : 0));
-		server->v_grab_y = server->v_cursor->y - (node.y + box.y + (edges & WLR_EDGE_BOTTOM ? box.height : 0));
-		server->v_grab_geobox = box;
-		server->v_grab_geobox.x += node.x;
-		server->v_grab_geobox.y += node.y;
-		server->v_resize_edges = edges;
+		auto cursor = server->v_cursor;
+		server->v_on_cursor_motion = [self, box, edges, cursor,
+			x = box.x + (edges & WLR_EDGE_RIGHT ? box.width : 0) - cursor->x,
+			y = box.y + (edges & WLR_EDGE_BOTTOM ? box.height : 0) - cursor->y
+		](auto a_time)
+		{
+			int left = edges & WLR_EDGE_LEFT ? x + cursor->x : box.x;
+			int right = edges & WLR_EDGE_RIGHT ? x + cursor->x : box.x + box.width;
+			int top = edges & WLR_EDGE_TOP ? y + cursor->y : box.y;
+			int bottom = edges & WLR_EDGE_BOTTOM ? y + cursor->y : box.y + box.height;
+			self->v_on_ack_configure = [self, box, edges,
+				serial = wlr_xdg_toplevel_set_size(self->v_toplevel, std::max(right - left, 1), std::max(bottom - top, 1))
+			](auto a_serial)
+			{
+				self->v_on_commit = [self, box, edges]
+				{
+					wlr_box size;
+					wlr_xdg_surface_get_geometry(self->v_toplevel->base, &size);
+					wlr_scene_node_set_position(&self->v_scene_tree->node, edges & WLR_EDGE_LEFT ? box.x + box.width - size.width : box.x, edges & WLR_EDGE_TOP ? box.y + box.height - size.height : box.y);
+					self->v_on_commit = f_on_commit_none;
+				};
+				if (a_serial >= serial) self->v_on_ack_configure = f_on_ack_configure_none;
+			};
+		};
+		server->v_on_cursor_button = server->v_on_cursor_button_ungrab;
 	};
 	wl_signal_add(&v_toplevel->events.request_resize, &v_request_resize);
 	v_request_maximize.notify = [](auto a_listener, auto a_data)
@@ -608,7 +630,7 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	wl_signal_add(&v_toplevel->events.request_fullscreen, &v_request_fullscreen);
 }
 
-t_popup::t_popup(wlr_xdg_popup* a_popup) : v_popup(a_popup)
+t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server), v_popup(a_popup)
 {
 	auto parent = wlr_xdg_surface_try_from_wlr_surface(v_popup->parent);
 	assert(parent != NULL);
@@ -624,56 +646,10 @@ t_popup::t_popup(wlr_xdg_popup* a_popup) : v_popup(a_popup)
 	v_destroy.notify = [](auto a_listener, auto a_data)
 	{
 		t_popup* self = wl_container_of(a_listener, self, v_destroy);
+		self->v_server->v_on_unmap(self->v_popup->base);
 		delete self;
 	};
 	wl_signal_add(&v_popup->events.destroy, &v_destroy);
-}
-
-void t_server::f_process_cursor_resize(uint32_t a_time)
-{
-	double x = v_cursor->x - v_grab_x;
-	int left = v_grab_geobox.x;
-	int right = v_grab_geobox.x + v_grab_geobox.width;
-	if (v_resize_edges & WLR_EDGE_LEFT) {
-		left = x;
-		if (left >= right) left = right - 1;
-	} else if (v_resize_edges & WLR_EDGE_RIGHT) {
-		right = x;
-		if (right <= left) right = left + 1;
-	}
-	double y = v_cursor->y - v_grab_y;
-	int top = v_grab_geobox.y;
-	int bottom = v_grab_geobox.y + v_grab_geobox.height;
-	if (v_resize_edges & WLR_EDGE_TOP) {
-		top = y;
-		if (top >= bottom) top = bottom - 1;
-	} else if (v_resize_edges & WLR_EDGE_BOTTOM) {
-		bottom = y;
-		if (bottom <= top) bottom = top + 1;
-	}
-	v_grabbed_toplevel->v_resize_edges = v_resize_edges;
-	v_grabbed_toplevel->v_resize_serial = wlr_xdg_toplevel_set_size(v_grabbed_toplevel->v_toplevel, right - left, bottom - top);
-}
-
-void t_server::f_process_cursor_motion(uint32_t a_time)
-{
-	if (v_cursor_mode == c_CURSOR_MOVE) return wlr_scene_node_set_position(&v_grabbed_toplevel->v_scene_tree->node, v_cursor->x - v_grab_x, v_cursor->y - v_grab_y);
-	if (v_cursor_mode == c_CURSOR_RESIZE) return f_process_cursor_resize(a_time);
-	if (v_grabbed_surface) {
-		int x, y;
-		wlr_scene_node_coords(&v_grabbed_surface->buffer->node, &x, &y);
-		wlr_seat_pointer_notify_motion(v_seat, a_time, v_cursor->x - x, v_cursor->y - y);
-		return;
-	}
-	double sx, sy;
-	auto surface = f_surface_at_cursor(&sx, &sy);
-	if (!f_toplevel(surface)) wlr_cursor_set_xcursor(v_cursor, v_xcursor_manager, "default");
-	if (surface) {
-		wlr_seat_pointer_notify_enter(v_seat, surface->surface, sx, sy);
-		wlr_seat_pointer_notify_motion(v_seat, a_time, sx, sy);
-	} else {
-		wlr_seat_pointer_clear_focus(v_seat);
-	}
 }
 
 t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loop(v_display), NULL))
@@ -707,7 +683,8 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	wl_signal_add(&v_xdg_shell->events.new_toplevel, &v_new_xdg_toplevel);
 	v_new_xdg_popup.notify = [](auto a_listener, auto a_data)
 	{
-		new t_popup(static_cast<wlr_xdg_popup*>(a_data));
+		t_server* self = wl_container_of(a_listener, self, v_new_xdg_popup);
+		new t_popup(self, static_cast<wlr_xdg_popup*>(a_data));
 	};
 	wl_signal_add(&v_xdg_shell->events.new_popup, &v_new_xdg_popup);
 	v_cursor = wlr_cursor_create();
@@ -718,7 +695,7 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		t_server* self = wl_container_of(a_listener, self, v_cursor_motion);
 		auto event = static_cast<wlr_pointer_motion_event*>(a_data);
 		wlr_cursor_move(self->v_cursor, &event->pointer->base, event->delta_x, event->delta_y);
-		self->f_process_cursor_motion(event->time_msec);
+		self->v_on_cursor_motion(event->time_msec);
 	};
 	wl_signal_add(&v_cursor->events.motion, &v_cursor_motion);
 	v_cursor_motion_absolute.notify = [](auto a_listener, auto a_data)
@@ -726,7 +703,7 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		t_server* self = wl_container_of(a_listener, self, v_cursor_motion_absolute);
 		auto event = static_cast<wlr_pointer_motion_absolute_event*>(a_data);
 		wlr_cursor_warp_absolute(self->v_cursor, &event->pointer->base, event->x, event->y);
-		self->f_process_cursor_motion(event->time_msec);
+		self->v_on_cursor_motion(event->time_msec);
 	};
 	wl_signal_add(&v_cursor->events.motion_absolute, &v_cursor_motion_absolute);
 	v_cursor_button.notify = [](auto a_listener, auto a_data)
@@ -734,19 +711,7 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		t_server* self = wl_container_of(a_listener, self, v_cursor_button);
 		auto event = static_cast<wlr_pointer_button_event*>(a_data);
 		wlr_seat_pointer_notify_button(self->v_seat, event->time_msec, event->button, event->state);
-		if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
-			if (self->v_grabbed_surface) self->f_ungrab_pointer();
-			self->f_reset_cursor_mode();
-		} else if (!self->v_grabbed_surface) {
-			auto surface = self->f_surface_at_cursor(NULL, NULL);
-			self->v_grabbed_surface = surface;
-			if (auto p = self->f_toplevel(surface)) {
-				p->f_focus();
-			} else {
-				if (auto p = self->v_seat->keyboard_state.focused_surface) if (auto q = wlr_xdg_toplevel_try_from_wlr_surface(p)) wlr_xdg_toplevel_set_activated(q, false);
-				wlr_seat_keyboard_notify_clear_focus(self->v_seat);
-			}
-		}
+		self->v_on_cursor_button(event->state);
 	};
 	wl_signal_add(&v_cursor->events.button, &v_cursor_button);
 	v_cursor_axis.notify = [](wl_listener* a_listener, void* a_data)
@@ -830,6 +795,33 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		}
 	};
 	wl_signal_add(&v_seat->keyboard_state.events.focus_change, &v_keyboard_state_focus_change);
+	v_on_cursor_motion = v_on_cursor_motion_forward = [&](auto a_time)
+	{
+		f_pointer_motion(&a_time);
+	};
+	v_on_cursor_button = v_on_cursor_button_grab = [&](auto a_state)
+	{
+		auto surface = f_surface_at_cursor(NULL, NULL);
+		if (auto p = f_toplevel(surface)) {
+			p->f_focus();
+		} else {
+			if (auto p = v_seat->keyboard_state.focused_surface) if (auto q = wlr_xdg_toplevel_try_from_wlr_surface(p)) wlr_xdg_toplevel_set_activated(q, false);
+			wlr_seat_keyboard_notify_clear_focus(v_seat);
+		}
+		if (!surface) return;
+		f_on_unmap_ungrab(surface->surface);
+		v_on_cursor_motion = [&, surface](auto a_time)
+		{
+			int x, y;
+			wlr_scene_node_coords(&surface->buffer->node, &x, &y);
+			wlr_seat_pointer_notify_motion(v_seat, a_time, v_cursor->x - x, v_cursor->y - y);
+		};
+		v_on_cursor_button = v_on_cursor_button_ungrab;
+	};
+	v_on_cursor_button_ungrab = [&](auto a_state)
+	{
+		if (a_state == WL_POINTER_BUTTON_STATE_RELEASED) f_ungrab_pointer();
+	};
 }
 
 void t_server::f_blur_text_input()
@@ -848,12 +840,12 @@ int main(int argc, char* argv[])
 			startup_cmd = optarg;
 			break;
 		default:
-			printf("Usage: %s [-s startup command]\n", argv[0]);
+			std::printf("Usage: %s [-s startup command]\n", argv[0]);
 			return 0;
 		}
 	}
 	if (optind < argc) {
-		printf("Usage: %s [-s startup command]\n", argv[0]);
+		std::printf("Usage: %s [-s startup command]\n", argv[0]);
 		return 0;
 	}
 	t_server server;
