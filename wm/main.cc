@@ -165,8 +165,8 @@ struct t_toplevel
 	wl_listener v_map;
 	wl_listener v_unmap;
 	wl_listener v_commit;
-	wl_listener v_destroy;
 	wl_listener v_ack_configure;
+	wl_listener v_destroy;
 	wl_listener v_request_move;
 	wl_listener v_request_resize;
 	wl_listener v_request_maximize;
@@ -181,6 +181,13 @@ struct t_toplevel
 	std::function<void(uint32_t)> v_on_ack_configure = f_on_ack_configure_none;
 
 	t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel);
+	~t_toplevel()
+	{
+		wl_list_remove(&v_map.link);
+		wl_list_remove(&v_unmap.link);
+		wl_list_remove(&v_commit.link);
+		wl_list_remove(&v_ack_configure.link);
+	}
 	void f_focus()
 	{
 		auto seat = v_server->v_seat;
@@ -203,6 +210,11 @@ struct t_popup
 	wl_listener v_destroy;
 
 	t_popup(t_server* a_server, wlr_xdg_popup* a_popup);
+	~t_popup()
+	{
+		v_server->v_on_unmap(v_popup->base);
+		wl_list_remove(&v_commit.link);
+	}
 };
 
 struct t_keyboard
@@ -256,6 +268,12 @@ struct t_input_popup
 	wl_listener v_destroy;
 
 	t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_popup);
+	~t_input_popup()
+	{
+		wl_list_remove(&v_commit.link);
+		wl_list_remove(&v_map.link);
+		wl_list_remove(&v_unmap.link);
+	}
 	void f_move(wlr_text_input_v3* a_input)
 	{
 		auto cursor = a_input->current.cursor_rectangle;
@@ -551,18 +569,18 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		self->v_on_commit();
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.commit, &v_commit);
-	v_destroy.notify = [](auto a_listener, auto a_data)
-	{
-		t_toplevel* self = wl_container_of(a_listener, self, v_destroy);
-		delete self;
-	};
-	wl_signal_add(&v_toplevel->events.destroy, &v_destroy);
 	v_ack_configure.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_ack_configure);
 		self->v_on_ack_configure(static_cast<wlr_xdg_surface_configure*>(a_data)->serial);
 	};
 	wl_signal_add(&v_toplevel->base->events.ack_configure, &v_ack_configure);
+	v_destroy.notify = [](auto a_listener, auto a_data)
+	{
+		t_toplevel* self = wl_container_of(a_listener, self, v_destroy);
+		delete self;
+	};
+	wl_signal_add(&v_toplevel->events.destroy, &v_destroy);
 	v_request_move.notify = [](auto a_listener, auto a_data)
 	{
 		// TODO: check the serial.
@@ -646,7 +664,6 @@ t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server
 	v_destroy.notify = [](auto a_listener, auto a_data)
 	{
 		t_popup* self = wl_container_of(a_listener, self, v_destroy);
-		self->v_server->v_on_unmap(self->v_popup->base);
 		delete self;
 	};
 	wl_signal_add(&v_popup->events.destroy, &v_destroy);
