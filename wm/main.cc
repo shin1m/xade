@@ -208,6 +208,7 @@ struct t_popup
 	wlr_xdg_popup* v_popup;
 	wl_listener v_commit;
 	wl_listener v_destroy;
+	wl_listener v_reposition;
 
 	t_popup(t_server* a_server, wlr_xdg_popup* a_popup);
 	~t_popup()
@@ -215,6 +216,16 @@ struct t_popup
 		v_server->v_on_unmap(v_popup->base);
 		wl_list_remove(&v_commit.link);
 	}
+	void f_place()
+	{
+		int x;
+		int y;
+		wlr_xdg_popup_get_toplevel_coords(v_popup, 0, 0, &x, &y);
+		auto layout = v_server->v_output_layout;
+		wlr_box box;
+		wlr_output_layout_get_box(layout, wlr_output_layout_output_at(layout, x, y), &box);
+		wlr_xdg_popup_unconstrain_from_box(v_popup, &box);
+	};
 };
 
 struct t_keyboard
@@ -623,9 +634,12 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 			{
 				self->v_on_commit = [self, box, edges]
 				{
-					wlr_box size;
-					wlr_xdg_surface_get_geometry(self->v_toplevel->base, &size);
-					wlr_scene_node_set_position(&self->v_scene_tree->node, edges & WLR_EDGE_LEFT ? box.x + box.width - size.width : box.x, edges & WLR_EDGE_TOP ? box.y + box.height - size.height : box.y);
+					wlr_box resized;
+					wlr_xdg_surface_get_geometry(self->v_toplevel->base, &resized);
+					wlr_scene_node_set_position(&self->v_scene_tree->node,
+						(edges & WLR_EDGE_LEFT ? box.x + box.width - resized.width : box.x) - resized.x,
+						(edges & WLR_EDGE_TOP ? box.y + box.height - resized.height : box.y) - resized.y
+					);
 					self->v_on_commit = f_on_commit_none;
 				};
 				if (a_serial >= serial) self->v_on_ack_configure = f_on_ack_configure_none;
@@ -657,8 +671,7 @@ t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server
 	v_commit.notify = [](auto a_listener, auto a_data)
 	{
 		t_popup* self = wl_container_of(a_listener, self, v_commit);
-		// TODO: adjust the position.
-		if (self->v_popup->base->initial_commit) wlr_xdg_surface_schedule_configure(self->v_popup->base);
+		if (self->v_popup->base->initial_commit) self->f_place();
 	};
 	wl_signal_add(&v_popup->base->surface->events.commit, &v_commit);
 	v_destroy.notify = [](auto a_listener, auto a_data)
@@ -667,6 +680,12 @@ t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server
 		delete self;
 	};
 	wl_signal_add(&v_popup->events.destroy, &v_destroy);
+	v_reposition.notify = [](auto a_listener, auto a_data)
+	{
+		t_popup* self = wl_container_of(a_listener, self, v_reposition);
+		self->f_place();
+	};
+	wl_signal_add(&v_popup->events.reposition, &v_reposition);
 }
 
 t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loop(v_display), NULL))
