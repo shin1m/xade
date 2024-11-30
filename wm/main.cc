@@ -62,7 +62,7 @@ struct t_server
 
 	wlr_seat* v_seat;
 	wl_listener v_new_input;
-	wl_listener v_request_cursor;
+	wl_listener v_request_set_cursor;
 	wl_listener v_request_set_selection;
 	wl_list v_keyboards;
 	static void f_on_unmap_none(wlr_xdg_surface* a_surface)
@@ -605,6 +605,7 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 			wlr_scene_node_set_position(&node, x + cursor->x, y + cursor->y);
 		};
 		server->v_on_cursor_button = server->v_on_cursor_button_ungrab;
+		wlr_seat_pointer_clear_focus(server->v_seat);
 	};
 	wl_signal_add(&v_toplevel->events.request_move, &v_request_move);
 	v_request_resize.notify = [](auto a_listener, auto a_data)
@@ -646,6 +647,7 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 			};
 		};
 		server->v_on_cursor_button = server->v_on_cursor_button_ungrab;
+		wlr_seat_pointer_clear_focus(server->v_seat);
 	};
 	wl_signal_add(&v_toplevel->events.request_resize, &v_request_resize);
 	v_request_maximize.notify = [](auto a_listener, auto a_data)
@@ -782,14 +784,14 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	};
 	wl_signal_add(&v_backend->events.new_input, &v_new_input);
 	v_seat = wlr_seat_create(v_display, "seat0");
-	v_request_cursor.notify = [](auto a_listener, auto a_data)
+	v_request_set_cursor.notify = [](auto a_listener, auto a_data)
 	{
-		t_server* self = wl_container_of(a_listener, self, v_request_cursor);
+		t_server* self = wl_container_of(a_listener, self, v_request_set_cursor);
 		auto event = static_cast<wlr_seat_pointer_request_set_cursor_event*>(a_data);
 		auto focused_client = self->v_seat->pointer_state.focused_client;
 		if (focused_client == event->seat_client) wlr_cursor_set_surface(self->v_cursor, event->surface, event->hotspot_x, event->hotspot_y);
 	};
-	wl_signal_add(&v_seat->events.request_set_cursor, &v_request_cursor);
+	wl_signal_add(&v_seat->events.request_set_cursor, &v_request_set_cursor);
 	v_request_set_selection.notify = [](auto a_listener, auto a_data)
 	{
 		t_server* self = wl_container_of(a_listener, self, v_request_set_selection);
