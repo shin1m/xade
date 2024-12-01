@@ -18,16 +18,9 @@ add_executable(xadeim
 	main.cc
 )
 target_include_directories(xadeim PRIVATE
-	${SKIA}
 	${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(xadeim
 	xade
-	OpenGL::GL
-	Fontconfig::Fontconfig
-	Freetype::Freetype
-	JPEG::JPEG
-	PNG::PNG
-	WebP::webp WebP::webpdemux
-	-L${SKIA}/out/Static -lskia
+	xadeskia
 )

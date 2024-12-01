@@ -14,7 +14,7 @@ function(add_protocol protocol)
 endfunction()
 add_protocol(stable/xdg-shell/xdg-shell.xml)
 add_protocol(unstable/text-input/text-input-unstable-v3.xml)
-add_library(xade
+add_library(xade SHARED
 	xdg-shell-client.h
 	xdg-shell.c
 	text-input-unstable-v3-client.h
@@ -32,6 +32,19 @@ target_link_libraries(xade
 	OpenGL::EGL
 	${WAYLAND_LIBRARIES}
 	suisha
+)
+add_library(xadeskia SHARED
+	skia.cc
+)
+target_compile_features(xadeskia PUBLIC cxx_std_20)
+target_include_directories(xadeskia PUBLIC
+	"$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+	"$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
+	"$<INSTALL_INTERFACE:include>"
+)
+target_link_libraries(xadeskia
+	OpenGL::GL
+	skia
 )
 install(FILES
 	${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client.h

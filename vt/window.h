@@ -3,11 +3,9 @@
 
 #include "terminal.h"
 #include "theme.h"
-#include <GLES3/gl3.h>
+#include <xade/skia.h>
 #include <include/core/SkFontMetrics.h>
 #include <include/core/SkRegion.h>
-#include <include/core/SkSurface.h>
-#include <include/gpu/GrDirectContext.h>
 
 class t_window
 {

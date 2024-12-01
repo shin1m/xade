@@ -2,21 +2,13 @@
 #include "basic_dictionary.h"
 #include "input-method-unstable-v2.h"
 #include <xade/client.h>
+#include <xade/skia.h>
 #include <dirent.h>
 #include <sys/mman.h>
-#include <GLES3/gl3.h>
 #include <include/core/SkCanvas.h>
-#include <include/core/SkColorSpace.h>
 #include <include/core/SkFont.h>
 #include <include/core/SkFontMetrics.h>
 #include <include/core/SkFontMgr.h>
-#include <include/core/SkRegion.h>
-#include <include/core/SkSurface.h>
-#include <include/gpu/GrBackendSurface.h>
-#include <include/gpu/GrDirectContext.h>
-#include <include/gpu/ganesh/SkSurfaceGanesh.h>
-#include <include/gpu/ganesh/gl/GrGLBackendSurface.h>
-#include <include/gpu/ganesh/gl/GrGLDirectContext.h>
 #include <include/ports/SkFontMgr_fontconfig.h>
 
 namespace
@@ -98,7 +90,7 @@ public:
 		int size = std::ceil(v_font.getMetrics(&v_metrics));
 		v_surface.f_create(size, size);
 		v_surface.f_make_current();
-		v_sk_context = GrDirectContexts::MakeGL();
+		v_sk_context = skia::f_new_direct_context();
 		v_surface.v_on_frame = [&](auto a_time)
 		{
 			std::vector rows{1, f_status()};
@@ -133,12 +125,7 @@ public:
 			if (width != width0 || height != height0) {
 				v_sk_surface.reset();
 				wl_egl_window_resize(v_surface, width, height, 0, 0);
-				GrGLFramebufferInfo fi;
-				fi.fFBOID = 0;
-				fi.fFormat = GL_RGBA8;
-				auto target = GrBackendRenderTargets::MakeGL(width, height, 1, 0, fi);
-				v_sk_surface = SkSurfaces::WrapBackendRenderTarget(v_sk_context.get(), target, kBottomLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, {}, nullptr);
-				if (!v_sk_surface) throw std::runtime_error("SkSurfaces::WrapBackendRenderTarget");
+				v_sk_surface = skia::f_new_surface(v_sk_context.get(), 0, width, height);
 			}
 			auto& canvas = *v_sk_surface->getCanvas();
 			SkPaint paint;

@@ -1,10 +1,5 @@
 #include "window.h"
 #include <sys/ioctl.h>
-#include <include/core/SkColorSpace.h>
-#include <include/gpu/GrBackendSurface.h>
-#include <include/gpu/ganesh/SkSurfaceGanesh.h>
-#include <include/gpu/ganesh/gl/GrGLBackendSurface.h>
-#include <include/gpu/ganesh/gl/GrGLDirectContext.h>
 
 t_window::t_code t_window::f_code(xkb_keysym_t a_key)
 {
@@ -511,17 +506,10 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			glGenFramebuffers(1, &v_framebuffer);
 			glBindFramebuffer(GL_FRAMEBUFFER, v_framebuffer);
 			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, v_renderbuffer);
-			v_context = GrDirectContexts::MakeGL();
+			v_context = skia::f_new_direct_context();
 		}
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, a_width, a_height);
-		{
-			GrGLFramebufferInfo fi;
-			fi.fFBOID = v_framebuffer;
-			fi.fFormat = GL_RGBA8;
-			auto target = GrBackendRenderTargets::MakeGL(a_width, a_height, 1, 0, fi);
-			v_surface = SkSurfaces::WrapBackendRenderTarget(v_context.get(), target, kBottomLeft_GrSurfaceOrigin, kRGBA_8888_SkColorType, {}, nullptr);
-			if (!v_surface) throw std::runtime_error("SkSurfaces::WrapBackendRenderTarget");
-		}
+		v_surface = skia::f_new_surface(v_context.get(), v_framebuffer, a_width, a_height);
 		auto frame = v_decoration.v_theme.f_frame(v_frame);
 		v_width = a_width - v_decoration.v_theme.v_unit.fWidth - frame.fLeft - frame.fRight;
 		v_height = a_height - frame.fTop - frame.fBottom;
