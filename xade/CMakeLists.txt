@@ -7,7 +7,7 @@ function(add_protocol protocol)
 		VERBATIM
 	)
 	add_custom_command(OUTPUT ${name}.c
-		COMMAND ${WAYLAND_SCANNER} private-code ${in} ${name}.c
+		COMMAND ${WAYLAND_SCANNER} public-code ${in} ${name}.c
 		DEPENDS ${in}
 		VERBATIM
 	)

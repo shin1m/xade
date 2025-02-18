@@ -17,7 +17,7 @@ v_part_cursors{
 	{"s-resize"},
 	{"se-resize"}
 },
-v_cursor_text("text"), v_cursor_arrow("arrow")
+v_cursor_text("text"), v_cursor_arrow("default")
 {
 	SkUnichar cs[] = {L'\ue5d2', L'\ue931', L'\ue930', L'\ue5d0', L'\ue5cd'};
 	v_font.unicharsToGlyphs(cs, 5, v_glyphs);

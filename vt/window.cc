@@ -546,7 +546,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		glDeleteFramebuffers(1, &v_framebuffer);
 		glDeleteRenderbuffers(1, &v_renderbuffer);
 	};
-	v_frame.v_on_close = [&]
+	v_frame.v_on_close = []
 	{
 		suisha::f_loop().f_exit();
 	};

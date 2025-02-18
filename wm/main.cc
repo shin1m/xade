@@ -19,6 +19,9 @@ extern "C"
 #include <wlr/types/wlr_input_method_v2.h>
 #undef delete
 #include <wlr/types/wlr_keyboard.h>
+#define namespace surface_namespace
+#include <wlr/types/wlr_layer_shell_v1.h>
+#undef namespace
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_pointer.h>
@@ -34,9 +37,13 @@ extern "C"
 }
 #include <xkbcommon/xkbcommon.h>
 
-struct t_toplevel;
 struct t_input_method;
 struct t_text_input;
+
+struct t_focusable
+{
+	virtual void f_focus() = 0;
+};
 
 struct t_server
 {
@@ -46,11 +53,16 @@ struct t_server
 	wlr_allocator* v_allocator = NULL;
 	wlr_scene* v_scene = NULL;
 	wlr_scene_output_layout* v_scene_layout;
+	wlr_scene_tree* v_tree;
+	wlr_scene_tree* v_layers[4];
 
 	wlr_xdg_shell* v_xdg_shell;
 	wl_listener v_new_xdg_toplevel;
 	wl_listener v_new_xdg_popup;
 	wl_list v_toplevels;
+
+	wlr_layer_shell_v1* v_layer_shell;
+	wl_listener v_layer_new_surface;
 
 	wlr_cursor* v_cursor = NULL;
 	wlr_xcursor_manager* v_xcursor_manager = NULL;
@@ -95,34 +107,24 @@ struct t_server
 	t_text_input* v_focused_text_input = nullptr;
 
 	t_server();
-	~t_server()
-	{
-		wl_display_destroy_clients(v_display);
-		if (v_scene) wlr_scene_node_destroy(&v_scene->tree.node);
-		wlr_xcursor_manager_destroy(v_xcursor_manager);
-		if (v_cursor) wlr_cursor_destroy(v_cursor);
-		wlr_allocator_destroy(v_allocator);
-		wlr_renderer_destroy(v_renderer);
-		wlr_backend_destroy(v_backend);
-		wl_display_destroy(v_display);
-	}
+	~t_server();
 	wlr_scene_surface* f_surface_at_cursor(double* a_sx, double* a_sy)
 	{
 		auto node = wlr_scene_node_at(&v_scene->tree.node, v_cursor->x, v_cursor->y, a_sx, a_sy);
-		return node && node->type == WLR_SCENE_NODE_BUFFER ? wlr_scene_surface_try_from_buffer(wlr_scene_buffer_from_node(node)) : nullptr;
+		return node && node->type == WLR_SCENE_NODE_BUFFER ? wlr_scene_surface_try_from_buffer(wlr_scene_buffer_from_node(node)) : NULL;
 	}
-	t_toplevel* f_toplevel(wlr_scene_surface* a_surface)
+	t_focusable* f_focusable(wlr_scene_surface* a_surface)
 	{
 		if (!a_surface) return nullptr;
 		auto tree = a_surface->buffer->node.parent;
 		while (tree && !tree->node.data) tree = tree->node.parent;
-		return tree ? static_cast<t_toplevel*>(tree->node.data) : nullptr;
+		return tree ? static_cast<t_focusable*>(tree->node.data) : nullptr;
 	}
 	void f_pointer_motion(uint32_t* a_time)
 	{
 		double sx, sy;
 		auto surface = f_surface_at_cursor(&sx, &sy);
-		if (!f_toplevel(surface)) wlr_cursor_set_xcursor(v_cursor, v_xcursor_manager, "default");
+		if (!f_focusable(surface)) wlr_cursor_set_xcursor(v_cursor, v_xcursor_manager, "default");
 		if (surface) {
 			wlr_seat_pointer_notify_enter(v_seat, surface->surface, sx, sy);
 			if (a_time) wlr_seat_pointer_notify_motion(v_seat, *a_time, sx, sy);
@@ -146,17 +148,22 @@ struct t_output
 	t_server* v_server;
 	wlr_output* v_output;
 	wl_listener v_frame;
+	wl_listener v_commit;
 	wl_listener v_request_state;
 	wl_listener v_destroy;
+	wlr_scene_tree* v_layers[4];
 
 	t_output(t_server* a_server, wlr_output* a_output);
 	~t_output()
 	{
+		for (auto p : v_layers) wlr_scene_node_destroy(&p->node);
 		wl_list_remove(&v_link);
+		wl_list_remove(&v_destroy.link);
 	}
+	void f_configure(zwlr_layer_shell_v1_layer a_layer);
 };
 
-struct t_toplevel
+struct t_toplevel : t_focusable
 {
 	wl_list v_link;
 	t_server* v_server;
@@ -187,18 +194,20 @@ struct t_toplevel
 		wl_list_remove(&v_unmap.link);
 		wl_list_remove(&v_commit.link);
 		wl_list_remove(&v_ack_configure.link);
+		wl_list_remove(&v_destroy.link);
 	}
-	void f_focus()
+	virtual void f_focus()
 	{
 		auto seat = v_server->v_seat;
 		auto current = seat->keyboard_state.focused_surface;
-		if (current == v_toplevel->base->surface) return;
+		auto surface = v_toplevel->base->surface;
+		if (current == surface) return;
 		if (current) if (auto p = wlr_xdg_toplevel_try_from_wlr_surface(current)) wlr_xdg_toplevel_set_activated(p, false);
 		wlr_scene_node_raise_to_top(&v_scene_tree->node);
 		wl_list_remove(&v_link);
 		wl_list_insert(&v_server->v_toplevels, &v_link);
 		wlr_xdg_toplevel_set_activated(v_toplevel, true);
-		if (auto p = wlr_seat_get_keyboard(seat)) wlr_seat_keyboard_notify_enter(seat, v_toplevel->base->surface, p->keycodes, p->num_keycodes, &p->modifiers);
+		if (auto p = wlr_seat_get_keyboard(seat)) wlr_seat_keyboard_notify_enter(seat, surface, p->keycodes, p->num_keycodes, &p->modifiers);
 	}
 };
 
@@ -215,6 +224,7 @@ struct t_popup
 	{
 		v_server->v_on_unmap(v_popup->base);
 		wl_list_remove(&v_commit.link);
+		wl_list_remove(&v_destroy.link);
 	}
 	void f_place()
 	{
@@ -226,6 +236,37 @@ struct t_popup
 		wlr_output_layout_get_box(layout, wlr_output_layout_output_at(layout, x, y), &box);
 		wlr_xdg_popup_unconstrain_from_box(v_popup, &box);
 	};
+};
+
+struct t_layer_surface : t_focusable
+{
+	t_server* v_server;
+	wlr_layer_surface_v1* v_surface;
+	wl_listener v_commit;
+	wl_listener v_destroy;
+	wl_listener v_new_popup;
+	wl_listener v_node_destroy;
+	zwlr_layer_shell_v1_layer v_layer = ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND;
+
+	t_layer_surface(t_server* a_server, wlr_layer_surface_v1* a_surface);
+	~t_layer_surface()
+	{
+		wl_list_remove(&v_commit.link);
+		wl_list_remove(&v_destroy.link);
+		wl_list_remove(&v_node_destroy.link);
+	}
+	virtual void f_focus()
+	{
+		auto seat = v_server->v_seat;
+		auto current = seat->keyboard_state.focused_surface;
+		auto surface = v_surface->current.keyboard_interactive == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE ? NULL : v_surface->surface;
+		if (current == surface) return;
+		if (current) if (auto p = wlr_xdg_toplevel_try_from_wlr_surface(current)) wlr_xdg_toplevel_set_activated(p, false);
+		if (!surface)
+			wlr_seat_keyboard_notify_clear_focus(seat);
+		else if (auto p = wlr_seat_get_keyboard(seat))
+			wlr_seat_keyboard_notify_enter(seat, surface, p->keycodes, p->num_keycodes, &p->modifiers);
+	}
 };
 
 struct t_keyboard
@@ -241,6 +282,7 @@ struct t_keyboard
 	~t_keyboard()
 	{
 		wl_list_remove(&v_link);
+		wl_list_remove(&v_destroy.link);
 	}
 };
 
@@ -257,6 +299,7 @@ struct t_input_method
 	~t_input_method()
 	{
 		v_server->v_input_method = nullptr;
+		wl_list_remove(&v_destroy.link);
 	}
 	operator wlr_input_method_v2*() const
 	{
@@ -284,11 +327,12 @@ struct t_input_popup
 		wl_list_remove(&v_commit.link);
 		wl_list_remove(&v_map.link);
 		wl_list_remove(&v_unmap.link);
+		wl_list_remove(&v_destroy.link);
 	}
 	void f_move(wlr_text_input_v3* a_input)
 	{
 		auto cursor = a_input->current.cursor_rectangle;
-		auto& node0 = static_cast<wlr_scene_tree*>(wlr_xdg_surface_try_from_wlr_surface(a_input->focused_surface)->data)->node;
+		auto& node0 = static_cast<wlr_scene_tree*>(a_input->focused_surface->data)->node;
 		cursor.x += node0.x;
 		cursor.y += node0.y;
 		wlr_box box;
@@ -353,6 +397,7 @@ struct t_text_input
 	~t_text_input()
 	{
 		if (v_server->v_focused_text_input == this) v_server->f_blur_text_input();
+		wl_list_remove(&v_destroy.link);
 	}
 	operator wlr_text_input_v3*() const
 	{
@@ -424,7 +469,7 @@ t_input_popup::t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_p
 	v_map.notify = [](auto a_listener, auto a_data)
 	{
 		t_input_popup* self = wl_container_of(a_listener, self, v_map);
-		self->v_popup->surface->data = wlr_scene_surface_create(&self->v_server->v_scene->tree, self->v_popup->surface);
+		self->v_popup->surface->data = wlr_scene_surface_create(self->v_server->v_tree, self->v_popup->surface);
 		self->f_move(*self->v_server->v_focused_text_input);
 	};
 	wl_signal_add(&v_popup->surface->events.map, &v_map);
@@ -432,7 +477,7 @@ t_input_popup::t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_p
 	{
 		t_input_popup* self = wl_container_of(a_listener, self, v_unmap);
 		wlr_scene_node_destroy(&static_cast<wlr_scene_surface*>(self->v_popup->surface->data)->buffer->node);
-		self->v_popup->surface->data = nullptr;
+		self->v_popup->surface->data = NULL;
 	};
 	wl_signal_add(&v_popup->surface->events.unmap, &v_unmap);
 	v_destroy.notify = [](auto a_listener, auto a_data)
@@ -446,7 +491,9 @@ t_input_popup::t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_p
 t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_server(a_server), v_keyboard(wlr_keyboard_from_input_device(a_device))
 {
 	auto context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	if (!context) throw std::runtime_error("failed to create xkb_context");
 	auto keymap = xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
+	if (!keymap) throw std::runtime_error("failed to create xkb_keymap");
 	wlr_keyboard_set_keymap(v_keyboard, keymap);
 	xkb_keymap_unref(keymap);
 	xkb_context_unref(context);
@@ -517,6 +564,7 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 
 t_output::t_output(t_server* a_server, wlr_output* a_output) : v_server(a_server), v_output(a_output)
 {
+	v_output->data = this;
 	wlr_output_init_render(v_output, v_server->v_allocator, v_server->v_renderer);
 	wlr_output_state state;
 	wlr_output_state_init(&state);
@@ -535,6 +583,17 @@ t_output::t_output(t_server* a_server, wlr_output* a_output) : v_server(a_server
 		wlr_scene_output_send_frame_done(scene_output, &now);
 	};
 	wl_signal_add(&v_output->events.frame, &v_frame);
+	v_commit.notify = [](auto a_listener, auto a_data)
+	{
+		auto event = static_cast<wlr_output_event_commit*>(a_data);
+		if (!(event->state->committed & WLR_OUTPUT_STATE_MODE)) return;
+		t_output* self = wl_container_of(a_listener, self, v_commit);
+		self->f_configure(ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND);
+		self->f_configure(ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM);
+		self->f_configure(ZWLR_LAYER_SHELL_V1_LAYER_TOP);
+		self->f_configure(ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY);
+	};
+	wl_signal_add(&v_output->events.commit, &v_commit);
 	v_request_state.notify = [](auto a_listener, auto a_data)
 	{
 		t_output* self = wl_container_of(a_listener, self, v_request_state);
@@ -548,17 +607,32 @@ t_output::t_output(t_server* a_server, wlr_output* a_output) : v_server(a_server
 		delete self;
 	};
 	wl_signal_add(&v_output->events.destroy, &v_destroy);
+	for (auto x : {
+		ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND,
+		ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM,
+		ZWLR_LAYER_SHELL_V1_LAYER_TOP,
+		ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY
+	}) v_layers[x] = wlr_scene_tree_create(v_server->v_layers[x]);
 	wl_list_insert(&v_server->v_outputs, &v_link);
 	auto l_output = wlr_output_layout_add_auto(v_server->v_output_layout, v_output);
 	auto scene_output = wlr_scene_output_create(v_server->v_scene, v_output);
 	wlr_scene_output_layout_add_output(v_server->v_scene_layout, l_output, scene_output);
 }
 
+void t_output::f_configure(zwlr_layer_shell_v1_layer a_layer)
+{
+	wlr_box full;
+	wlr_output_layout_get_box(v_server->v_output_layout, v_output, &full);
+	wlr_box usable = full;
+	wlr_scene_node* node;
+	wl_list_for_each(node, &v_layers[a_layer]->children, link) wlr_scene_layer_surface_v1_configure(static_cast<wlr_scene_layer_surface_v1*>(static_cast<t_layer_surface*>(node->data)->v_surface->data), &full, &usable);
+}
+
 t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_server(a_server), v_toplevel(a_toplevel)
 {
-	v_scene_tree = wlr_scene_xdg_surface_create(&v_server->v_scene->tree, v_toplevel->base);
+	v_scene_tree = wlr_scene_xdg_surface_create(v_server->v_tree, v_toplevel->base);
 	v_scene_tree->node.data = this;
-	v_toplevel->base->data = v_scene_tree;
+	v_toplevel->base->surface->data = v_scene_tree;
 	v_map.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_map);
@@ -666,10 +740,8 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 
 t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server), v_popup(a_popup)
 {
-	auto parent = wlr_xdg_surface_try_from_wlr_surface(v_popup->parent);
-	assert(parent != NULL);
-	auto parent_tree = static_cast<wlr_scene_tree*>(parent->data);
-	v_popup->base->data = wlr_scene_xdg_surface_create(parent_tree, v_popup->base);
+	auto parent_tree = static_cast<wlr_scene_tree*>(v_popup->parent->data);
+	v_popup->base->surface->data = wlr_scene_xdg_surface_create(parent_tree, v_popup->base);
 	v_commit.notify = [](auto a_listener, auto a_data)
 	{
 		t_popup* self = wl_container_of(a_listener, self, v_commit);
@@ -688,6 +760,60 @@ t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server
 		self->f_place();
 	};
 	wl_signal_add(&v_popup->events.reposition, &v_reposition);
+}
+
+t_layer_surface::t_layer_surface(t_server* a_server, wlr_layer_surface_v1* a_surface) : v_server(a_server), v_surface(a_surface)
+{
+	if (!v_surface->output) {
+		t_output* output;
+		wl_list_for_each(output, &v_server->v_outputs, v_link) {
+			v_surface->output = output->v_output;
+			break;
+		}
+	}
+	v_commit.notify = [](auto a_listener, auto a_data)
+	{
+		t_layer_surface* self = wl_container_of(a_listener, self, v_commit);
+		auto surface = self->v_surface;
+		auto output = static_cast<t_output*>(surface->output->data);
+		auto& current = surface->current;
+		if (current.committed & WLR_LAYER_SURFACE_V1_STATE_LAYER && current.layer != self->v_layer) {
+			wlr_scene_node_reparent(&static_cast<wlr_scene_tree*>(surface->surface->data)->node, output->v_layers[current.layer]);
+			output->f_configure(self->v_layer);
+			self->v_layer = current.layer;
+		}
+		if (current.committed & (
+			WLR_LAYER_SURFACE_V1_STATE_DESIRED_SIZE |
+			WLR_LAYER_SURFACE_V1_STATE_ANCHOR |
+			WLR_LAYER_SURFACE_V1_STATE_EXCLUSIVE_ZONE |
+			WLR_LAYER_SURFACE_V1_STATE_MARGIN |
+			WLR_LAYER_SURFACE_V1_STATE_LAYER
+		)) output->f_configure(current.layer);
+	};
+	wl_signal_add(&v_surface->surface->events.commit, &v_commit);
+	v_destroy.notify = [](auto a_listener, auto a_data)
+	{
+		t_layer_surface* self = wl_container_of(a_listener, self, v_destroy);
+		auto surface = self->v_surface;
+		delete self;
+		auto& node = static_cast<wlr_scene_tree*>(surface->surface->data)->node;
+		wl_list_remove(&node.link);
+		wl_list_init(&node.link);
+		static_cast<t_output*>(surface->output->data)->f_configure(surface->current.layer);
+	};
+	wl_signal_add(&v_surface->events.destroy, &v_destroy);
+	auto scene_surface = wlr_scene_layer_surface_v1_create(static_cast<t_output*>(v_surface->output->data)->v_layers[v_surface->current.layer], v_surface);
+	scene_surface->tree->node.data = this;
+	v_surface->data = scene_surface;
+	v_surface->surface->data = scene_surface->tree;
+	v_node_destroy.notify = [](auto a_listener, auto a_data)
+	{
+		t_layer_surface* self = wl_container_of(a_listener, self, v_node_destroy);
+		auto surface = self->v_surface;
+		delete self;
+		wlr_layer_surface_v1_destroy(surface);
+	};
+	wl_signal_add(&scene_surface->tree->node.events.destroy, &v_node_destroy);
 }
 
 t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loop(v_display), NULL))
@@ -711,6 +837,11 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	wl_signal_add(&v_backend->events.new_output, &v_new_output);
 	v_scene = wlr_scene_create();
 	v_scene_layout = wlr_scene_attach_output_layout(v_scene, v_output_layout);
+	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND] = wlr_scene_tree_create(&v_scene->tree);
+	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM] = wlr_scene_tree_create(&v_scene->tree);
+	v_tree = wlr_scene_tree_create(&v_scene->tree);
+	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP] = wlr_scene_tree_create(&v_scene->tree);
+	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = wlr_scene_tree_create(&v_scene->tree);
 	wl_list_init(&v_toplevels);
 	v_xdg_shell = wlr_xdg_shell_create(v_display, 3);
 	v_new_xdg_toplevel.notify = [](auto a_listener, auto a_data)
@@ -725,6 +856,13 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		new t_popup(self, static_cast<wlr_xdg_popup*>(a_data));
 	};
 	wl_signal_add(&v_xdg_shell->events.new_popup, &v_new_xdg_popup);
+	v_layer_shell = wlr_layer_shell_v1_create(v_display, 4);
+	v_layer_new_surface.notify = [](auto a_listener, auto a_data)
+	{
+		t_server* self = wl_container_of(a_listener, self, v_layer_new_surface);
+		new t_layer_surface(self, static_cast<wlr_layer_surface_v1*>(a_data));
+	};
+	wl_signal_add(&v_layer_shell->events.new_surface, &v_layer_new_surface);
 	v_cursor = wlr_cursor_create();
 	wlr_cursor_attach_output_layout(v_cursor, v_output_layout);
 	v_xcursor_manager = wlr_xcursor_manager_create(NULL, 24);
@@ -840,7 +978,7 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	v_on_cursor_button = v_on_cursor_button_grab = [&](auto a_state)
 	{
 		auto surface = f_surface_at_cursor(NULL, NULL);
-		if (auto p = f_toplevel(surface)) {
+		if (auto p = f_focusable(surface)) {
 			p->f_focus();
 		} else {
 			if (auto p = v_seat->keyboard_state.focused_surface) if (auto q = wlr_xdg_toplevel_try_from_wlr_surface(p)) wlr_xdg_toplevel_set_activated(q, false);
@@ -860,6 +998,23 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	{
 		if (a_state == WL_POINTER_BUTTON_STATE_RELEASED) f_ungrab_pointer();
 	};
+}
+
+t_server::~t_server()
+{
+	wl_display_destroy_clients(v_display);
+	{
+		t_output* p;
+		t_output* q;
+		wl_list_for_each_safe(p, q, &v_outputs, v_link) delete p;
+	}
+	if (v_scene) wlr_scene_node_destroy(&v_scene->tree.node);
+	wlr_xcursor_manager_destroy(v_xcursor_manager);
+	if (v_cursor) wlr_cursor_destroy(v_cursor);
+	wlr_allocator_destroy(v_allocator);
+	wlr_renderer_destroy(v_renderer);
+	wlr_backend_destroy(v_backend);
+	wl_display_destroy(v_display);
 }
 
 void t_server::f_blur_text_input()

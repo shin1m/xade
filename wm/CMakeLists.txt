@@ -1,15 +1,17 @@
-function(add_protocol protocol)
+function(add_protocol path protocol)
 	cmake_path(GET protocol STEM LAST_ONLY name)
-	set(in ${WAYLAND_PROTOCOLS}/${protocol})
+	set(in ${path}/${protocol})
 	add_custom_command(OUTPUT ${name}-protocol.h
 		COMMAND ${WAYLAND_SCANNER} server-header ${in} ${name}-protocol.h
 		DEPENDS ${in}
 		VERBATIM
 	)
 endfunction()
-add_protocol(stable/xdg-shell/xdg-shell.xml)
+add_protocol(${WAYLAND_PROTOCOLS} stable/xdg-shell/xdg-shell.xml)
+add_protocol(${WLR_PROTOCOLS} unstable/wlr-layer-shell-unstable-v1.xml)
 add_executable(xadewm
 	xdg-shell-protocol.h
+	wlr-layer-shell-unstable-v1-protocol.h
 	main.cc
 )
 target_compile_features(xadewm PRIVATE cxx_std_20)
