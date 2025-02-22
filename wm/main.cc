@@ -51,6 +51,9 @@ struct t_server
 	wlr_backend* v_backend;
 	wlr_renderer* v_renderer = NULL;
 	wlr_allocator* v_allocator = NULL;
+	wlr_output_layout* v_output_layout;
+	wl_list v_outputs;
+	wl_listener v_new_output;
 	wlr_scene* v_scene = NULL;
 	wlr_scene_output_layout* v_scene_layout;
 	wlr_scene_tree* v_tree;
@@ -93,10 +96,6 @@ struct t_server
 	std::function<void(wl_pointer_button_state)> v_on_cursor_button;
 	std::function<void(wl_pointer_button_state)> v_on_cursor_button_grab;
 	std::function<void(wl_pointer_button_state)> v_on_cursor_button_ungrab;
-
-	wlr_output_layout* v_output_layout;
-	wl_list v_outputs;
-	wl_listener v_new_output;
 
 	wlr_input_method_manager_v2* v_input_method_manager;
 	wl_listener v_input_method_input_method;
@@ -426,142 +425,6 @@ struct t_text_input
 	}
 };
 
-t_input_method::t_input_method(t_server* a_server, wlr_input_method_v2* a_input_method) : v_server(a_server), v_input_method(a_input_method)
-{
-	v_commit.notify = [](auto a_listener, auto a_data)
-	{
-		t_input_method* self = wl_container_of(a_listener, self, v_commit);
-		if (auto p = self->v_server->v_focused_text_input) {
-			auto& state = self->v_input_method->current;
-			auto& preedit = state.preedit;
-			wlr_text_input_v3_send_preedit_string(*p, preedit.text, preedit.cursor_begin, preedit.cursor_end);
-			wlr_text_input_v3_send_commit_string(*p, state.commit_text);
-			auto& ds = state.delete_surrounding;
-			wlr_text_input_v3_send_delete_surrounding_text(*p, ds.before_length, ds.after_length);
-			wlr_text_input_v3_send_done(*p);
-		}
-	};
-	wl_signal_add(&v_input_method->events.commit, &v_commit);
-	v_new_popup_surface.notify = [](auto a_listener, auto a_data)
-	{
-		t_input_method* self = wl_container_of(a_listener, self, v_new_popup_surface);
-		new t_input_popup(self->v_server, static_cast<wlr_input_popup_surface_v2*>(a_data));
-	};
-	wl_signal_add(&v_input_method->events.new_popup_surface, &v_new_popup_surface);
-	v_destroy.notify = [](auto a_listener, auto a_data)
-	{
-		t_input_method* self = wl_container_of(a_listener, self, v_destroy);
-		delete self;
-	};
-	wl_signal_add(&v_input_method->events.destroy, &v_destroy);
-	v_server->v_input_method = this;
-}
-
-t_input_popup::t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_popup) : v_server(a_server), v_popup(a_popup)
-{
-	v_popup->data = this;
-	v_commit.notify = [](auto a_listener, auto a_data)
-	{
-		t_input_popup* self = wl_container_of(a_listener, self, v_commit);
-		if (self->v_popup->surface->data) self->f_move(*self->v_server->v_focused_text_input);
-	};
-	wl_signal_add(&v_popup->surface->events.commit, &v_commit);
-	v_map.notify = [](auto a_listener, auto a_data)
-	{
-		t_input_popup* self = wl_container_of(a_listener, self, v_map);
-		self->v_popup->surface->data = wlr_scene_surface_create(self->v_server->v_tree, self->v_popup->surface);
-		self->f_move(*self->v_server->v_focused_text_input);
-	};
-	wl_signal_add(&v_popup->surface->events.map, &v_map);
-	v_unmap.notify = [](auto a_listener, auto a_data)
-	{
-		t_input_popup* self = wl_container_of(a_listener, self, v_unmap);
-		wlr_scene_node_destroy(&static_cast<wlr_scene_surface*>(self->v_popup->surface->data)->buffer->node);
-		self->v_popup->surface->data = NULL;
-	};
-	wl_signal_add(&v_popup->surface->events.unmap, &v_unmap);
-	v_destroy.notify = [](auto a_listener, auto a_data)
-	{
-		t_input_popup* self = wl_container_of(a_listener, self, v_destroy);
-		delete self;
-	};
-	wl_signal_add(&v_popup->events.destroy, &v_destroy);
-}
-
-t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_server(a_server), v_keyboard(wlr_keyboard_from_input_device(a_device))
-{
-	auto context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	if (!context) throw std::runtime_error("failed to create xkb_context");
-	auto keymap = xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
-	if (!keymap) throw std::runtime_error("failed to create xkb_keymap");
-	wlr_keyboard_set_keymap(v_keyboard, keymap);
-	xkb_keymap_unref(keymap);
-	xkb_context_unref(context);
-	wlr_keyboard_set_repeat_info(v_keyboard, 25, 600);
-	v_modifiers.notify = [](auto a_listener, auto a_data)
-	{
-		t_keyboard* self = wl_container_of(a_listener, self, v_modifiers);
-		if (auto p = self->v_server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
-			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
-			wlr_input_method_keyboard_grab_v2_send_modifiers(q, &self->v_keyboard->modifiers);
-			return;
-		}
-		wlr_seat_set_keyboard(self->v_server->v_seat, self->v_keyboard);
-		wlr_seat_keyboard_notify_modifiers(self->v_server->v_seat, &self->v_keyboard->modifiers);
-	};
-	wl_signal_add(&v_keyboard->events.modifiers, &v_modifiers);
-	v_key.notify = [](auto a_listener, auto a_data)
-	{
-		t_keyboard* self = wl_container_of(a_listener, self, v_key);
-		auto server = self->v_server;
-		auto event = static_cast<wlr_keyboard_key_event*>(a_data);
-		if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-			auto sym = xkb_state_key_get_one_sym(self->v_keyboard->xkb_state, event->keycode + 8);
-			if (wlr_keyboard_get_modifiers(self->v_keyboard) & WLR_MODIFIER_ALT)
-				switch (sym) {
-				case XKB_KEY_Escape:
-					wl_display_terminate(server->v_display);
-					return;
-				case XKB_KEY_F1:
-					if (wl_list_length(&server->v_toplevels) > 1) {
-						t_toplevel* p = wl_container_of(server->v_toplevels.prev, p, v_link);
-						p->f_focus();
-					}
-					return;
-				}
-			if (sym == XKB_KEY_Kanji || sym == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
-				p->v_on ^= true;
-				if (p->v_on) {
-					wlr_input_method_v2_send_activate(*p);
-					q->f_send();
-				} else {
-					p->f_deactivate();
-					wlr_text_input_v3_send_preedit_string(*q, NULL, 0, 0);
-					wlr_text_input_v3_send_done(*q);
-				}
-				return;
-			}
-		}
-		if (auto p = server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
-			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
-			wlr_input_method_keyboard_grab_v2_send_key(q, event->time_msec, event->keycode, event->state);
-			return;
-		}
-		auto seat = server->v_seat;
-		wlr_seat_set_keyboard(seat, self->v_keyboard);
-		wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
-	};
-	wl_signal_add(&v_keyboard->events.key, &v_key);
-	v_destroy.notify = [](auto a_listener, auto a_data)
-	{
-		t_keyboard* self = wl_container_of(a_listener, self, v_destroy);
-		delete self;
-	};
-	wl_signal_add(&a_device->events.destroy, &v_destroy);
-	wlr_seat_set_keyboard(v_server->v_seat, v_keyboard);
-	wl_list_insert(&v_server->v_keyboards, &v_link);
-}
-
 t_output::t_output(t_server* a_server, wlr_output* a_output) : v_server(a_server), v_output(a_output)
 {
 	v_output->data = this;
@@ -816,6 +679,142 @@ t_layer_surface::t_layer_surface(t_server* a_server, wlr_layer_surface_v1* a_sur
 	wl_signal_add(&scene_surface->tree->node.events.destroy, &v_node_destroy);
 }
 
+t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_server(a_server), v_keyboard(wlr_keyboard_from_input_device(a_device))
+{
+	auto context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+	if (!context) throw std::runtime_error("failed to create xkb_context");
+	auto keymap = xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
+	if (!keymap) throw std::runtime_error("failed to create xkb_keymap");
+	wlr_keyboard_set_keymap(v_keyboard, keymap);
+	xkb_keymap_unref(keymap);
+	xkb_context_unref(context);
+	wlr_keyboard_set_repeat_info(v_keyboard, 25, 600);
+	v_modifiers.notify = [](auto a_listener, auto a_data)
+	{
+		t_keyboard* self = wl_container_of(a_listener, self, v_modifiers);
+		if (auto p = self->v_server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
+			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
+			wlr_input_method_keyboard_grab_v2_send_modifiers(q, &self->v_keyboard->modifiers);
+			return;
+		}
+		wlr_seat_set_keyboard(self->v_server->v_seat, self->v_keyboard);
+		wlr_seat_keyboard_notify_modifiers(self->v_server->v_seat, &self->v_keyboard->modifiers);
+	};
+	wl_signal_add(&v_keyboard->events.modifiers, &v_modifiers);
+	v_key.notify = [](auto a_listener, auto a_data)
+	{
+		t_keyboard* self = wl_container_of(a_listener, self, v_key);
+		auto server = self->v_server;
+		auto event = static_cast<wlr_keyboard_key_event*>(a_data);
+		if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+			auto sym = xkb_state_key_get_one_sym(self->v_keyboard->xkb_state, event->keycode + 8);
+			if (wlr_keyboard_get_modifiers(self->v_keyboard) & WLR_MODIFIER_ALT)
+				switch (sym) {
+				case XKB_KEY_Escape:
+					wl_display_terminate(server->v_display);
+					return;
+				case XKB_KEY_F1:
+					if (wl_list_length(&server->v_toplevels) > 1) {
+						t_toplevel* p = wl_container_of(server->v_toplevels.prev, p, v_link);
+						p->f_focus();
+					}
+					return;
+				}
+			if (sym == XKB_KEY_Kanji || sym == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
+				p->v_on ^= true;
+				if (p->v_on) {
+					wlr_input_method_v2_send_activate(*p);
+					q->f_send();
+				} else {
+					p->f_deactivate();
+					wlr_text_input_v3_send_preedit_string(*q, NULL, 0, 0);
+					wlr_text_input_v3_send_done(*q);
+				}
+				return;
+			}
+		}
+		if (auto p = server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
+			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
+			wlr_input_method_keyboard_grab_v2_send_key(q, event->time_msec, event->keycode, event->state);
+			return;
+		}
+		auto seat = server->v_seat;
+		wlr_seat_set_keyboard(seat, self->v_keyboard);
+		wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
+	};
+	wl_signal_add(&v_keyboard->events.key, &v_key);
+	v_destroy.notify = [](auto a_listener, auto a_data)
+	{
+		t_keyboard* self = wl_container_of(a_listener, self, v_destroy);
+		delete self;
+	};
+	wl_signal_add(&a_device->events.destroy, &v_destroy);
+	wlr_seat_set_keyboard(v_server->v_seat, v_keyboard);
+	wl_list_insert(&v_server->v_keyboards, &v_link);
+}
+
+t_input_method::t_input_method(t_server* a_server, wlr_input_method_v2* a_input_method) : v_server(a_server), v_input_method(a_input_method)
+{
+	v_commit.notify = [](auto a_listener, auto a_data)
+	{
+		t_input_method* self = wl_container_of(a_listener, self, v_commit);
+		if (auto p = self->v_server->v_focused_text_input) {
+			auto& state = self->v_input_method->current;
+			auto& preedit = state.preedit;
+			wlr_text_input_v3_send_preedit_string(*p, preedit.text, preedit.cursor_begin, preedit.cursor_end);
+			wlr_text_input_v3_send_commit_string(*p, state.commit_text);
+			auto& ds = state.delete_surrounding;
+			wlr_text_input_v3_send_delete_surrounding_text(*p, ds.before_length, ds.after_length);
+			wlr_text_input_v3_send_done(*p);
+		}
+	};
+	wl_signal_add(&v_input_method->events.commit, &v_commit);
+	v_new_popup_surface.notify = [](auto a_listener, auto a_data)
+	{
+		t_input_method* self = wl_container_of(a_listener, self, v_new_popup_surface);
+		new t_input_popup(self->v_server, static_cast<wlr_input_popup_surface_v2*>(a_data));
+	};
+	wl_signal_add(&v_input_method->events.new_popup_surface, &v_new_popup_surface);
+	v_destroy.notify = [](auto a_listener, auto a_data)
+	{
+		t_input_method* self = wl_container_of(a_listener, self, v_destroy);
+		delete self;
+	};
+	wl_signal_add(&v_input_method->events.destroy, &v_destroy);
+	v_server->v_input_method = this;
+}
+
+t_input_popup::t_input_popup(t_server* a_server, wlr_input_popup_surface_v2* a_popup) : v_server(a_server), v_popup(a_popup)
+{
+	v_popup->data = this;
+	v_commit.notify = [](auto a_listener, auto a_data)
+	{
+		t_input_popup* self = wl_container_of(a_listener, self, v_commit);
+		if (self->v_popup->surface->data) self->f_move(*self->v_server->v_focused_text_input);
+	};
+	wl_signal_add(&v_popup->surface->events.commit, &v_commit);
+	v_map.notify = [](auto a_listener, auto a_data)
+	{
+		t_input_popup* self = wl_container_of(a_listener, self, v_map);
+		self->v_popup->surface->data = wlr_scene_surface_create(self->v_server->v_tree, self->v_popup->surface);
+		self->f_move(*self->v_server->v_focused_text_input);
+	};
+	wl_signal_add(&v_popup->surface->events.map, &v_map);
+	v_unmap.notify = [](auto a_listener, auto a_data)
+	{
+		t_input_popup* self = wl_container_of(a_listener, self, v_unmap);
+		wlr_scene_node_destroy(&static_cast<wlr_scene_surface*>(self->v_popup->surface->data)->buffer->node);
+		self->v_popup->surface->data = NULL;
+	};
+	wl_signal_add(&v_popup->surface->events.unmap, &v_unmap);
+	v_destroy.notify = [](auto a_listener, auto a_data)
+	{
+		t_input_popup* self = wl_container_of(a_listener, self, v_destroy);
+		delete self;
+	};
+	wl_signal_add(&v_popup->events.destroy, &v_destroy);
+}
+
 t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loop(v_display), NULL))
 {
 	if (!v_backend) throw std::runtime_error("failed to create wlr_backend");
@@ -842,8 +841,8 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	v_tree = wlr_scene_tree_create(&v_scene->tree);
 	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP] = wlr_scene_tree_create(&v_scene->tree);
 	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = wlr_scene_tree_create(&v_scene->tree);
-	wl_list_init(&v_toplevels);
 	v_xdg_shell = wlr_xdg_shell_create(v_display, 3);
+	wl_list_init(&v_toplevels);
 	v_new_xdg_toplevel.notify = [](auto a_listener, auto a_data)
 	{
 		t_server* self = wl_container_of(a_listener, self, v_new_xdg_toplevel);
