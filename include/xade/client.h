@@ -5,8 +5,8 @@
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 #include <wayland-egl.h>
-#include "xdg-shell-client.h"
-#include "text-input-unstable-v3-client.h"
+#include "xdg-shell.h"
+#include "text-input-unstable-v3.h"
 #include <xkbcommon/xkbcommon.h>
 #include <EGL/egl.h>
 #include <suisha/loop.h>

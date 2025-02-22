@@ -1,15 +1,4 @@
-set(name input-method-unstable-v2)
-set(in ${CMAKE_CURRENT_SOURCE_DIR}/${name}.xml)
-add_custom_command(OUTPUT ${name}.h
-	COMMAND ${WAYLAND_SCANNER} client-header ${in} ${name}.h
-	DEPENDS ${in}
-	VERBATIM
-)
-add_custom_command(OUTPUT ${name}.c
-	COMMAND ${WAYLAND_SCANNER} private-code ${in} ${name}.c
-	DEPENDS ${in}
-	VERBATIM
-)
+add_wayland_client(${CMAKE_CURRENT_SOURCE_DIR} input-method-unstable-v2 private)
 add_executable(xadeim
 	engine.cc
 	basic_dictionary.cc

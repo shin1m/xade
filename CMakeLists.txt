@@ -21,6 +21,19 @@ set(SKIA ${PROJECT_SOURCE_DIR}/skia)
 add_library(skia SHARED IMPORTED)
 target_include_directories(skia INTERFACE ${SKIA})
 set_property(TARGET skia PROPERTY IMPORTED_LOCATION ${SKIA}/out/Shared/libskia.so)
+function(add_wayland_client path name visibility)
+	set(in ${path}/${name}.xml)
+	add_custom_command(OUTPUT ${name}.h
+		COMMAND ${WAYLAND_SCANNER} client-header ${in} ${name}.h
+		DEPENDS ${in}
+		VERBATIM
+	)
+	add_custom_command(OUTPUT ${name}.c
+		COMMAND ${WAYLAND_SCANNER} ${visibility}-code ${in} ${name}.c
+		DEPENDS ${in}
+		VERBATIM
+	)
+endfunction()
 add_subdirectory(xade)
 add_subdirectory(vt)
 add_subdirectory(wm)

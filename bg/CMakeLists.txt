@@ -1,15 +1,4 @@
-set(name wlr-layer-shell-unstable-v1)
-set(in ${WLR_PROTOCOLS}/unstable/${name}.xml)
-add_custom_command(OUTPUT ${name}.h
-	COMMAND ${WAYLAND_SCANNER} client-header ${in} ${name}.h
-	DEPENDS ${in}
-	VERBATIM
-)
-add_custom_command(OUTPUT ${name}.c
-	COMMAND ${WAYLAND_SCANNER} private-code ${in} ${name}.c
-	DEPENDS ${in}
-	VERBATIM
-)
+add_wayland_client(${WLR_PROTOCOLS}/unstable wlr-layer-shell-unstable-v1 private)
 add_executable(xadebg
 	wlr-layer-shell-unstable-v1.h
 	wlr-layer-shell-unstable-v1.c
