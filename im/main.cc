@@ -19,7 +19,7 @@ class t_context : public t_engine
 	static zwp_input_method_v2_listener v_zwp_input_method_v2_listener;
 	static zwp_input_method_keyboard_grab_v2_listener v_zwp_input_method_keyboard_grab_v2_listener;
 
-	t_converter<wchar_t, char> v_converter{"wchar_t", "utf-8"};
+	t_converter<wchar_t, char> v_wctoutf8{"wchar_t", "utf-8"};
 	std::vector<wchar_t> v_cs;
 	std::vector<t_attribute> v_as;
 	bool v_forwarded;
@@ -60,7 +60,7 @@ protected:
 		v_cs.clear();
 		v_as.clear();
 		std::vector<char> cs;
-		v_converter(a_cs, a_cs + a_n, std::back_inserter(cs));
+		v_wctoutf8(a_cs, a_n, f_appender(cs));
 		cs.push_back('\0');
 		zwp_input_method_v2_commit_string(v_input, cs.data());
 		zwp_input_method_v2_commit(v_input, v_serial);
@@ -228,21 +228,21 @@ void t_context::f_send_preedit()
 	size_t begin;
 	size_t end;
 	if (f_candidates().empty()) {
-		auto i = v_cs.begin() + f_caret();
-		v_converter(v_cs.begin(), i, std::back_inserter(cs));
+		auto i = f_caret();
+		v_wctoutf8(v_cs.data(), i, f_appender(cs));
 		begin = cs.size();
-		v_converter(i, v_cs.end(), std::back_inserter(cs));
+		v_wctoutf8(v_cs.data() + i, v_cs.size() - i, f_appender(cs));
 		end = cs.size();
 	} else {
 		auto i = std::find(v_as.begin(), v_as.end(), c_attribute__CANDIDATE);
-		auto j = v_cs.begin() + (i - v_as.begin());
-		v_converter(v_cs.begin(), j, std::back_inserter(cs));
+		auto j = i - v_as.begin();
+		v_wctoutf8(v_cs.data(), j, f_appender(cs));
 		begin = cs.size();
 		while (i != v_as.end() && *i == c_attribute__CANDIDATE) ++i;
-		auto k = v_cs.begin() + (i - v_as.begin());
-		v_converter(j, k, std::back_inserter(cs));
+		auto k = i - v_as.begin();
+		v_wctoutf8(v_cs.data() + j, k - j, f_appender(cs));
 		end = cs.size();
-		v_converter(k, v_cs.end(), std::back_inserter(cs));
+		v_wctoutf8(v_cs.data() + k, v_cs.size() - k, f_appender(cs));
 	}
 	cs.push_back('\0');
 	zwp_input_method_v2_set_preedit_string(v_input, cs.data(), begin, end);

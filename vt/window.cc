@@ -601,12 +601,10 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			const char* cs = v_buffer.f_code(code, i);
 			f_send(cs, std::strlen(cs));
 		} else if (a_c != L'\0') {
-			char mbs[MB_LEN_MAX];
-			std::mbstate_t state{};
-			size_t n = std::wcrtomb(mbs, a_c, &state);
-			if (n != size_t(-1)) f_send(mbs, n);
-			n = std::wcrtomb(mbs, L'\0', &state);
-			if (n != size_t(-1)) f_send(mbs, n - 1);
+			v_utf32tomb(&a_c, 1, [&](auto p, auto n)
+			{
+				f_send(p, n);
+			});
 		}
 	};
 	v_frame.v_on_input_enable = [&]
@@ -619,45 +617,38 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		v_preedit_valid = false;
 		v_preedit_text.clear();
 	};
-	auto convert = [](auto a_p, auto a_q, auto& a_mbstate, auto& a_put)
-	{
-		while (a_p < a_q) {
-			wchar_t c;
-			size_t n = std::mbrtowc(&c, a_p, a_q - a_p, &a_mbstate);
-			if (n == size_t(-2)) break;
-			if (n == size_t(-1)) {
-				a_mbstate = {};
-				++a_p;
-			} else if (n == 0) {
-				a_put(L'\0');
-				++a_p;
-			} else {
-				a_put(c);
-				a_p += n;
-			}
-		}
-		return a_p;
-	};
-	v_frame.v_on_input_done = [&, convert]
+	v_frame.v_on_input_done = [&]
 	{
 		auto& text = v_frame.f_input()->f_text();
-		f_send(text.data(), text.size());
+		v_utf8tomb(text.c_str(), text.size(), [&](auto p, auto n)
+		{
+			f_send(p, n);
+		});
 		auto [preedit, begin, end] = v_frame.f_input()->f_preedit();
 		if (begin > end) return;
 		v_preedit_valid = false;
 		v_preedit_text.clear();
 		if (preedit.empty()) return;
-		auto p = preedit.c_str();
-		std::mbstate_t mbstate{};
-		auto put = [&](auto a_c)
+		auto append = [&](auto p, auto n)
 		{
-			v_preedit_text.push_back(a_c);
+			v_preedit_text.insert(v_preedit_text.end(), p, p + n);
 		};
-		convert(p, p + begin, mbstate, put);
-		v_preedit_begin = v_preedit_text.size();
-		convert(p + begin, p + end, mbstate, put);
-		v_preedit_end = v_preedit_text.size();
-		convert(p + end, p + preedit.size(), mbstate, put);
+		auto p = preedit.c_str();
+		if (begin < 0) {
+			v_preedit_begin = begin;
+			begin = 0;
+		} else {
+			v_utf8towc(p, begin, append);
+			v_preedit_begin = v_preedit_text.size();
+		}
+		if (end < 0) {
+			v_utf8towc(p + begin, preedit.size() - begin, append);
+			v_preedit_end = end;
+		} else {
+			v_utf8towc(p + begin, end - begin, append);
+			v_preedit_end = v_preedit_text.size();
+			v_utf8towc(p + end, preedit.size() - end, append);
+		}
 	};
 	f_client().v_on_idle.push_back([&]
 	{
@@ -831,7 +822,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	{
 		if (a_axis == WL_POINTER_AXIS_VERTICAL_SCROLL) f_position__(v_position + std::copysign(v_unit.fHeight * 4, a_value));
 	};
-	suisha::f_loop().f_poll(a_master, true, false, [&, convert](auto a_readable, auto)
+	suisha::f_loop().f_poll(a_master, true, false, [&](auto a_readable, auto)
 	{
 		if (!a_readable) return;
 		ssize_t n = read(v_master, v_mbs + v_mbn, sizeof(v_mbs) - v_mbn);
@@ -842,12 +833,26 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		v_mbn += n;
 		if (v_mbn <= 0) return suisha::f_loop().f_exit();
 		f_invalidate(v_buffer.f_cursor_y(), 1);
+		auto p = v_mbs;
 		auto q = v_mbs + v_mbn;
-		auto p = convert(v_mbs, q, v_mbstate, v_buffer);
-		if (p < q) {
-			std::copy(p, q, v_mbs);
-			v_mbstate = {};
-		}
+		do {
+			wchar_t c;
+			size_t n = std::mbrtowc(&c, p, q - p, &v_mbstate);
+			if (n == size_t(-2)) {
+				std::copy(p, q, v_mbs);
+				v_mbstate = {};
+				break;
+			} else if (n == size_t(-1)) {
+				v_mbstate = {};
+				++p;
+			} else if (n == 0) {
+				v_buffer(L'\0');
+				++p;
+			} else {
+				v_buffer(c);
+				p += n;
+			}
+		} while (p < q);
 		v_mbn = q - p;
 		f_invalidate(v_buffer.f_cursor_y(), 1);
 		v_preedit_valid = false;

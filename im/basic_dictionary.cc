@@ -292,7 +292,7 @@ void f_add(std::deque<t_candidate>& a_candidates, std::map<std::wstring, t_candi
 	for (const auto& x : a_texts) f_add(a_candidates, a_map, x, std::wstring());
 }
 
-void f_put(std::map<std::wstring, std::vector<std::wstring> >& a_map, const std::wstring& a_entry, const std::wstring& a_text)
+void f_put(std::map<std::wstring, std::vector<std::wstring>>& a_map, const std::wstring& a_entry, const std::wstring& a_text)
 {
 	auto i = a_map.lower_bound(a_entry);
 	if (i == a_map.end() || i->first != a_entry) i = a_map.emplace_hint(i, a_entry, std::vector<std::wstring>());
@@ -306,7 +306,7 @@ void f_search(const char* a_path, const char* a_entry, size_t a_n, bool a_ari, s
 	t_file file(a_path, "rb");
 	if (!file.f_seek(a_entry, a_n, a_ari)) return;
 	t_decoder<t_file> decoder(file, "euc-jp");
-	t_lexer<t_decoder<t_file> > lexer(decoder);
+	t_lexer<t_decoder<t_file>> lexer(decoder);
 	while (lexer.f_token() == c_token__TEXT) {
 		f_add(a_candidates, a_map, lexer.f_text(), lexer.f_annotation());
 		lexer.f_next();
@@ -338,7 +338,7 @@ void t_basic_dictionary::f_load()
 		if (c != L' ') continue;
 		t_map0& map = v_aris.emplace(std::wstring(cs.begin(), cs.end()), t_map0()).first->second;
 		auto texts = map.emplace(std::wstring(), std::vector<std::wstring>()).first;
-		t_lexer<t_decoder<t_file> > lexer(decoder);
+		t_lexer<t_decoder<t_file>> lexer(decoder);
 		while (lexer.f_token() != c_token__NONE) {
 			if (lexer.f_token() == c_token__TEXT)
 				texts->second.push_back(lexer.f_text());
@@ -359,7 +359,7 @@ void t_basic_dictionary::f_load()
 		}
 		if (c != L' ') continue;
 		std::vector<std::wstring>& texts = v_nashis.emplace(std::wstring(cs.begin(), cs.end()), std::vector<std::wstring>()).first->second;
-		t_lexer<t_decoder<t_file> > lexer(decoder);
+		t_lexer<t_decoder<t_file>> lexer(decoder);
 		while (lexer.f_token() == c_token__TEXT) {
 			texts.push_back(lexer.f_text());
 			lexer.f_next();
@@ -417,7 +417,7 @@ void t_basic_dictionary::f_search(const wchar_t* a_entry, size_t a_n, size_t a_o
 		if (i != v_nashis.end()) f_add(a_candidates, map, i->second);
 	}
 	std::vector<char> cs;
-	v_converter(a_entry, a_entry + a_n, std::back_inserter(cs));
+	v_wctoeuc(a_entry, a_n, f_appender(cs));
 	for (const auto& x : v_publics) ::f_search(x.c_str(), &cs[0], cs.size(), ari, a_candidates, map);
 }
 

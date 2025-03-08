@@ -12,7 +12,7 @@ class t_basic_dictionary : public t_dictionary
 	using t_map0 = std::map<std::wstring, std::vector<std::wstring>>;
 	using t_map1 = std::map<std::wstring, t_map0>;
 
-	t_converter<wchar_t, char> v_converter{"wchar_t", "euc-jp"};
+	t_converter<wchar_t, char> v_wctoeuc{"wchar_t", "euc-jp"};
 	std::vector<std::string> v_publics;
 	std::string v_private;
 	t_map0 v_nashis;
@@ -27,5 +27,13 @@ public:
 	virtual void f_search(const wchar_t* a_entry, size_t a_n, size_t a_okuri, std::deque<t_candidate>& a_candidates) const;
 	virtual void f_register(const wchar_t* a_entry, size_t a_n, size_t a_okuri, const wchar_t* a_text, size_t a_m);
 };
+
+inline auto f_appender(auto& a_xs)
+{
+	return [&](auto p, auto n)
+	{
+		a_xs.insert(a_xs.end(), p, p + n);
+	};
+}
 
 #endif

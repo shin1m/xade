@@ -3,6 +3,7 @@
 
 #include "terminal.h"
 #include "theme.h"
+#include <xade/converter.h>
 #include <xade/skia.h>
 #include <include/core/SkFontMetrics.h>
 #include <include/core/SkRegion.h>
@@ -30,6 +31,9 @@ class t_window
 
 	static t_code f_code(xkb_keysym_t a_key);
 
+	t_converter<char32_t, char> v_utf32tomb{"utf-32", ""};
+	t_converter<char, char> v_utf8tomb{"utf-8", ""};
+	t_converter<char, wchar_t> v_utf8towc{"utf-8", "wchar_t"};
 	t_terminal<t_window> v_buffer;
 	int v_master;
 	char v_mbs[MB_LEN_MAX * 256];

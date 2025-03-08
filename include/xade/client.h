@@ -192,9 +192,9 @@ public:
 	std::function<void(uint32_t, double)> v_on_scroll;
 	std::function<void()> v_on_focus_enter;
 	std::function<void()> v_on_focus_leave;
-	std::function<void(xkb_keysym_t, wchar_t)> v_on_key_press;
-	std::function<void(xkb_keysym_t, wchar_t)> v_on_key_release;
-	std::function<void(xkb_keysym_t, wchar_t)> v_on_key_repeat;
+	std::function<void(xkb_keysym_t, char32_t)> v_on_key_press;
+	std::function<void(xkb_keysym_t, char32_t)> v_on_key_release;
+	std::function<void(xkb_keysym_t, char32_t)> v_on_key_repeat;
 	std::function<void()> v_on_input_enable;
 	std::function<void()> v_on_input_disable;
 	std::function<void()> v_on_input_done;
@@ -353,7 +353,6 @@ public:
 	t_input()
 	{
 		if (!v_input) throw std::runtime_error("text input");
-		zwp_text_input_v3_set_user_data(v_input, this);
 		zwp_text_input_v3_add_listener(v_input, &v_zwp_text_input_v3_listener, this);
 	}
 	~t_input()
