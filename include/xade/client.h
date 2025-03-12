@@ -10,6 +10,7 @@
 #include <xkbcommon/xkbcommon.h>
 #include <EGL/egl.h>
 #include <suisha/loop.h>
+#include "owner.h"
 
 namespace xade
 {
@@ -76,6 +77,9 @@ public:
 	}
 };
 
+#pragma push
+#pragma GCC diagnostic ignored "-Wsubobject-linkage"
+
 class t_client
 {
 	friend t_client& f_client();
@@ -90,17 +94,17 @@ class t_client
 	static inline t_client* v_instance;
 
 	std::function<void(wl_registry*, uint32_t, const char*, uint32_t)> v_on_global;
-	wl_display* v_display = NULL;
-	wl_registry* v_registry = NULL;
-	wl_compositor* v_compositor = NULL;
-	wl_shm* v_shm = NULL;
-	wl_seat* v_seat = NULL;
-	wl_pointer* v_pointer = NULL;
-	wl_cursor_theme* v_cursor_theme = NULL;
-	wl_keyboard* v_keyboard = NULL;
+	t_owner<wl_display*, wl_display_disconnect> v_display;
+	t_owner<wl_registry*, wl_registry_destroy> v_registry;
+	t_owner<wl_compositor*, wl_compositor_destroy> v_compositor;
+	t_owner<wl_shm*, wl_shm_release> v_shm;
+	t_owner<wl_seat*, wl_seat_release> v_seat;
+	t_owner<wl_pointer*, wl_pointer_release> v_pointer;
+	t_owner<wl_cursor_theme*, wl_cursor_theme_destroy> v_cursor_theme;
+	t_owner<wl_keyboard*, wl_keyboard_release> v_keyboard;
 	t_xkb v_xkb;
-	xdg_wm_base* v_xdg_wm_base = NULL;
-	EGLDisplay v_egl_display = EGL_NO_DISPLAY;
+	t_owner<xdg_wm_base*, xdg_wm_base_destroy> v_xdg_wm_base;
+	t_owner<EGLDisplay, eglTerminate, EGL_NO_DISPLAY> v_egl_display;
 	t_surface* v_pointer_focus = nullptr;
 	double v_pointer_x;
 	double v_pointer_y;
@@ -109,7 +113,7 @@ class t_client
 	const t_cursor* v_cursor = nullptr;
 	std::shared_ptr<suisha::t_timer> v_cursor_next;
 	t_surface* v_keyboard_focus = nullptr;
-	zwp_text_input_manager_v3* v_text_input_manager = NULL;
+	t_owner<zwp_text_input_manager_v3*, zwp_text_input_manager_v3_destroy> v_text_input_manager;
 	t_surface* v_input_focus = nullptr;
 
 public:
@@ -157,6 +161,10 @@ public:
 	{
 		return v_keyboard_focus;
 	}
+	const t_cursor* f_cursor() const
+	{
+		return v_cursor;
+	}
 	void f_cursor__(const t_cursor* a_value);
 	t_surface* f_input_focus() const
 	{
@@ -174,7 +182,7 @@ class t_surface
 {
 	static wl_callback_listener v_frame_listener;
 
-	wl_surface* v_surface = wl_compositor_create_surface(f_client());
+	t_owner<wl_surface*, wl_surface_destroy> v_surface;
 	EGLConfig v_egl_config;
 	EGLContext v_egl_context = EGL_NO_CONTEXT;
 	wl_egl_window* v_egl_window = NULL;
@@ -238,8 +246,8 @@ class t_frame : public t_surface
 	static xdg_surface_listener v_xdg_surface_listener;
 	static xdg_toplevel_listener v_xdg_toplevel_listener;
 
-	xdg_surface* v_xdg_surface = NULL;
-	xdg_toplevel* v_xdg_toplevel = NULL;
+	t_owner<xdg_surface*, xdg_surface_destroy> v_xdg_surface;
+	t_owner<xdg_toplevel*, xdg_toplevel_destroy> v_xdg_toplevel;
 	int32_t v_width = 0;
 	int32_t v_height = 0;
 	int32_t v_restore_width = 0;
@@ -311,19 +319,12 @@ class t_cursor
 {
 	friend class t_client;
 
-	wl_surface* v_surface = wl_compositor_create_surface(f_client());
 	wl_cursor* v_cursor;
+	t_owner<wl_surface*, wl_surface_destroy> v_surface;
 
 public:
-	t_cursor(const char* a_name) : v_cursor(wl_cursor_theme_get_cursor(f_client(), a_name))
-	{
-		if (!v_surface) throw std::runtime_error("surface");
-		if (!v_cursor) throw std::runtime_error(a_name);
-	}
-	~t_cursor()
-	{
-		if (v_surface) wl_surface_destroy(v_surface);
-	}
+	t_cursor(const char* a_name);
+	~t_cursor();
 };
 
 class t_input
@@ -333,7 +334,7 @@ class t_input
 
 	static zwp_text_input_v3_listener v_zwp_text_input_v3_listener;
 
-	zwp_text_input_v3* v_input = zwp_text_input_manager_v3_get_text_input(f_client().v_text_input_manager, f_client());
+	t_owner<zwp_text_input_v3*, zwp_text_input_v3_destroy> v_input;
 	uint32_t v_serial = 0;
 	uint32_t v_done = 0;
 	std::tuple<std::string, int32_t, int32_t> v_preedit{{}, 0, -1};
@@ -350,15 +351,8 @@ class t_input
 	void f_disable();
 
 public:
-	t_input()
-	{
-		if (!v_input) throw std::runtime_error("text input");
-		zwp_text_input_v3_add_listener(v_input, &v_zwp_text_input_v3_listener, this);
-	}
-	~t_input()
-	{
-		if (v_input) zwp_text_input_v3_destroy(v_input);
-	}
+	t_input();
+	~t_input();
 	operator zwp_text_input_v3*() const
 	{
 		return v_input;
@@ -385,6 +379,8 @@ public:
 		return v_delete;
 	}
 };
+
+#pragma pop
 
 }
 

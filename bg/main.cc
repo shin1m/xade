@@ -15,7 +15,7 @@ class t_layered : public t_surface
 {
 	static zwlr_layer_surface_v1_listener v_layer_surface_listener;
 
-	zwlr_layer_surface_v1* v_layer_surface = NULL;
+	t_owner<zwlr_layer_surface_v1*, zwlr_layer_surface_v1_destroy> v_layer_surface;
 	bool v_configuring = false;
 	uint32_t v_configure_serial;
 
@@ -88,15 +88,15 @@ void t_layered::f_configure(uint32_t a_serial, uint32_t a_width, uint32_t a_heig
 		f_request_frame();
 }
 
-t_layered::t_layered(zwlr_layer_shell_v1* a_shell, wl_output* a_output, uint32_t a_layer, const char* a_namespace) : v_layer_surface(zwlr_layer_shell_v1_get_layer_surface(a_shell, *this, a_output, a_layer, a_namespace))
+t_layered::t_layered(zwlr_layer_shell_v1* a_shell, wl_output* a_output, uint32_t a_layer, const char* a_namespace)
 {
+	v_layer_surface = zwlr_layer_shell_v1_get_layer_surface(a_shell, *this, a_output, a_layer, a_namespace);
 	if (!v_layer_surface) throw std::runtime_error("layer surface");
 	zwlr_layer_surface_v1_add_listener(*this, &v_layer_surface_listener, this);
 }
 
 t_layered::~t_layered()
 {
-	if (v_layer_surface) zwlr_layer_surface_v1_destroy(*this);
 }
 
 int main(int argc, char* argv[])

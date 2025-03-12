@@ -211,17 +211,7 @@ t_client::t_client(std::function<void(wl_registry*, uint32_t, const char*, uint3
 t_client::~t_client()
 {
 	v_instance = nullptr;
-	if (v_text_input_manager) zwp_text_input_manager_v3_destroy(v_text_input_manager);
-	if (v_egl_display != EGL_NO_DISPLAY) eglTerminate(v_egl_display);
-	if (v_xdg_wm_base) xdg_wm_base_destroy(v_xdg_wm_base);
-	if (v_cursor_theme) wl_cursor_theme_destroy(v_cursor_theme);
-	if (v_pointer) wl_pointer_release(v_pointer);
-	if (v_keyboard) wl_keyboard_release(v_keyboard);
-	if (v_seat) wl_seat_release(v_seat);
-	if (v_shm) wl_shm_release(v_shm);
-	if (v_compositor) wl_compositor_destroy(v_compositor);
-	if (v_registry) wl_registry_destroy(v_registry);
-	if (v_display) wl_display_disconnect(v_display);
+	eglMakeCurrent(v_egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 }
 
 void t_client::f_cursor__(const t_cursor* a_value)
@@ -265,7 +255,7 @@ wl_callback_listener t_surface::v_frame_listener = {
 	}
 };
 
-t_surface::t_surface()
+t_surface::t_surface() : v_surface(wl_compositor_create_surface(f_client()))
 {
 	if (!v_surface) throw std::runtime_error("surface");
 	wl_surface_set_user_data(v_surface, this);
@@ -295,7 +285,6 @@ t_surface::~t_surface()
 	if (v_frame) wl_callback_destroy(v_frame);
 	f_destroy();
 	if (v_egl_context != EGL_NO_CONTEXT) eglDestroyContext(f_client(), v_egl_context);
-	if (v_surface) wl_surface_destroy(v_surface);
 }
 
 void t_surface::f_create(size_t a_width, size_t a_height)
@@ -415,8 +404,18 @@ t_frame::t_frame() : v_xdg_surface(xdg_wm_base_get_xdg_surface(f_client(), *this
 
 t_frame::~t_frame()
 {
-	if (v_xdg_toplevel) xdg_toplevel_destroy(v_xdg_toplevel);
-	if (v_xdg_surface) xdg_surface_destroy(v_xdg_surface);
+}
+
+t_cursor::t_cursor(const char* a_name) : v_cursor(wl_cursor_theme_get_cursor(f_client(), a_name))
+{
+	if (!v_cursor) throw std::runtime_error(a_name);
+	v_surface = wl_compositor_create_surface(f_client());
+	if (!v_surface) throw std::runtime_error("surface");
+}
+
+t_cursor::~t_cursor()
+{
+	if (this == f_client().f_cursor()) f_client().f_cursor__(nullptr);
 }
 
 zwp_text_input_v3_listener t_input::v_zwp_text_input_v3_listener = {
@@ -454,6 +453,16 @@ zwp_text_input_v3_listener t_input::v_zwp_text_input_v3_listener = {
 		self.f_reset();
 	}
 };
+
+t_input::t_input() : v_input(zwp_text_input_manager_v3_get_text_input(f_client().v_text_input_manager, f_client()))
+{
+	if (!v_input) throw std::runtime_error("text input");
+	zwp_text_input_v3_add_listener(v_input, &v_zwp_text_input_v3_listener, this);
+}
+
+t_input::~t_input()
+{
+}
 
 void t_input::f_enable()
 {

@@ -23,16 +23,16 @@ class t_context : public t_engine
 	std::vector<wchar_t> v_cs;
 	std::vector<t_attribute> v_as;
 	bool v_forwarded;
-	zwp_input_method_v2* v_input;
+	t_owner<zwp_input_method_v2*, zwp_input_method_v2_destroy> v_input;
 	bool v_active = false;
 	uint32_t v_serial = 0;
 	SkFont v_font;
 	SkFontMetrics v_metrics;
 	t_surface v_surface;
-	zwp_input_popup_surface_v2* v_popup = NULL;
+	t_owner<zwp_input_popup_surface_v2*, zwp_input_popup_surface_v2_destroy> v_popup;
 	sk_sp<GrDirectContext> v_sk_context;
 	sk_sp<SkSurface> v_sk_surface;
-	zwp_input_method_keyboard_grab_v2* v_grab = NULL;
+	t_owner<zwp_input_method_keyboard_grab_v2*, zwp_input_method_keyboard_grab_v2_release> v_grab;
 	t_xkb v_xkb;
 
 	void f_send_preedit();
@@ -82,11 +82,13 @@ public:
 	t_context(t_dictionary& a_dictionary, zwp_input_method_manager_v2* a_manager, const SkFont& a_font) : t_engine(a_dictionary), v_font(a_font)
 	{
 		v_input = zwp_input_method_manager_v2_get_input_method(a_manager, f_client());
+		if (!v_input) throw std::runtime_error("input method");
 		zwp_input_method_v2_add_listener(v_input, &v_zwp_input_method_v2_listener, this);
 		auto region = wl_compositor_create_region(f_client());
 		wl_surface_set_input_region(v_surface, region);
 		wl_region_destroy(region);
 		v_popup = zwp_input_method_v2_get_input_popup_surface(v_input, v_surface);
+		if (!v_popup) throw std::runtime_error("input popup");
 		int size = std::ceil(v_font.getMetrics(&v_metrics));
 		v_surface.f_create(size, size);
 		v_surface.f_make_current();
@@ -146,12 +148,6 @@ public:
 			v_surface.f_swap_buffers();
 		};
 	}
-	~t_context()
-	{
-		if (v_grab) zwp_input_method_keyboard_grab_v2_release(v_grab);
-		if (v_popup) zwp_input_popup_surface_v2_destroy(v_popup);
-		if (v_input) zwp_input_method_v2_destroy(v_input);
-	}
 };
 
 zwp_input_method_v2_listener t_context::v_zwp_input_method_v2_listener = {
@@ -184,7 +180,6 @@ zwp_input_method_v2_listener t_context::v_zwp_input_method_v2_listener = {
 				self.v_surface.v_on_frame(0);
 			} else {
 				self.v_xkb.f_stop();
-				zwp_input_method_keyboard_grab_v2_release(self.v_grab);
 				self.v_grab = NULL;
 			}
 		}

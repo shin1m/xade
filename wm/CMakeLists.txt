@@ -16,6 +16,7 @@ add_executable(xadewm
 target_compile_features(xadewm PRIVATE cxx_std_20)
 target_include_directories(xadewm PRIVATE
 	${WLROOTS_INCLUDE_DIRS}
+	${PROJECT_SOURCE_DIR}/include
 	${CMAKE_CURRENT_BINARY_DIR}
 )
 target_compile_definitions(xadewm PRIVATE WLR_USE_UNSTABLE)

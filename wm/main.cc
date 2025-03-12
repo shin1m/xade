@@ -36,6 +36,9 @@ extern "C"
 #include <wlr/util/log.h>
 }
 #include <xkbcommon/xkbcommon.h>
+#include <xade/owner.h>
+
+using xade::t_owner;
 
 struct t_input_method;
 struct t_text_input;
@@ -47,14 +50,17 @@ struct t_focusable
 
 struct t_server
 {
-	wl_display* v_display = wl_display_create();
-	wlr_backend* v_backend;
-	wlr_renderer* v_renderer = NULL;
-	wlr_allocator* v_allocator = NULL;
+	t_owner<wl_display*, wl_display_destroy> v_display = wl_display_create();
+	t_owner<wlr_backend*, wlr_backend_destroy> v_backend;
+	t_owner<wlr_renderer*, wlr_renderer_destroy> v_renderer;
+	t_owner<wlr_allocator*, wlr_allocator_destroy> v_allocator;
 	wlr_output_layout* v_output_layout;
 	wl_list v_outputs;
 	wl_listener v_new_output;
-	wlr_scene* v_scene = NULL;
+	t_owner<wlr_scene*, [](auto a_p)
+	{
+		wlr_scene_node_destroy(&a_p->tree.node);
+	}> v_scene;
 	wlr_scene_output_layout* v_scene_layout;
 	wlr_scene_tree* v_tree;
 	wlr_scene_tree* v_layers[4];
@@ -67,8 +73,8 @@ struct t_server
 	wlr_layer_shell_v1* v_layer_shell;
 	wl_listener v_layer_new_surface;
 
-	wlr_cursor* v_cursor = NULL;
-	wlr_xcursor_manager* v_xcursor_manager = NULL;
+	t_owner<wlr_cursor*, wlr_cursor_destroy> v_cursor;
+	t_owner<wlr_xcursor_manager*, wlr_xcursor_manager_destroy> v_xcursor_manager;
 	wl_listener v_cursor_motion;
 	wl_listener v_cursor_motion_absolute;
 	wl_listener v_cursor_button;
@@ -438,8 +444,7 @@ t_output::t_output(t_server* a_server, wlr_output* a_output) : v_server(a_server
 	v_frame.notify = [](auto a_listener, auto a_data)
 	{
 		t_output* self = wl_container_of(a_listener, self, v_frame);
-		auto scene = self->v_server->v_scene;
-		auto scene_output = wlr_scene_get_scene_output(scene, self->v_output);
+		auto scene_output = wlr_scene_get_scene_output(self->v_server->v_scene, self->v_output);
 		wlr_scene_output_commit(scene_output, NULL);
 		timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
@@ -536,8 +541,8 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		auto server = self->v_server;
 		server->f_on_unmap_ungrab(self->v_toplevel->base->surface);
 		auto& node = self->v_scene_tree->node;
-		auto cursor = server->v_cursor;
-		server->v_on_cursor_motion = [&node, cursor, x = node.x - cursor->x, y = node.y - cursor->y](auto a_time)
+		auto& cursor = server->v_cursor;
+		server->v_on_cursor_motion = [&node, &cursor, x = node.x - cursor->x, y = node.y - cursor->y](auto a_time)
 		{
 			wlr_scene_node_set_position(&node, x + cursor->x, y + cursor->y);
 		};
@@ -556,8 +561,8 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		box.x += self->v_scene_tree->node.x;
 		box.y += self->v_scene_tree->node.y;
 		auto edges = static_cast<wlr_xdg_toplevel_resize_event*>(a_data)->edges;
-		auto cursor = server->v_cursor;
-		server->v_on_cursor_motion = [self, box, edges, cursor,
+		auto& cursor = server->v_cursor;
+		server->v_on_cursor_motion = [self, box, edges, &cursor,
 			x = box.x + (edges & WLR_EDGE_RIGHT ? box.width : 0) - cursor->x,
 			y = box.y + (edges & WLR_EDGE_BOTTOM ? box.height : 0) - cursor->y
 		](auto a_time)
@@ -681,13 +686,13 @@ t_layer_surface::t_layer_surface(t_server* a_server, wlr_layer_surface_v1* a_sur
 
 t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_server(a_server), v_keyboard(wlr_keyboard_from_input_device(a_device))
 {
-	auto context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	if (!context) throw std::runtime_error("failed to create xkb_context");
-	auto keymap = xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
-	if (!keymap) throw std::runtime_error("failed to create xkb_keymap");
-	wlr_keyboard_set_keymap(v_keyboard, keymap);
-	xkb_keymap_unref(keymap);
-	xkb_context_unref(context);
+	{
+		t_owner<xkb_context*, xkb_context_unref> context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+		if (!context) throw std::runtime_error("failed to create xkb_context");
+		t_owner<xkb_keymap*, xkb_keymap_unref> keymap = xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
+		if (!keymap) throw std::runtime_error("failed to create xkb_keymap");
+		wlr_keyboard_set_keymap(v_keyboard, keymap);
+	}
 	wlr_keyboard_set_repeat_info(v_keyboard, 25, 600);
 	v_modifiers.notify = [](auto a_listener, auto a_data)
 	{
@@ -1002,18 +1007,9 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 t_server::~t_server()
 {
 	wl_display_destroy_clients(v_display);
-	{
-		t_output* p;
-		t_output* q;
-		wl_list_for_each_safe(p, q, &v_outputs, v_link) delete p;
-	}
-	if (v_scene) wlr_scene_node_destroy(&v_scene->tree.node);
-	wlr_xcursor_manager_destroy(v_xcursor_manager);
-	if (v_cursor) wlr_cursor_destroy(v_cursor);
-	wlr_allocator_destroy(v_allocator);
-	wlr_renderer_destroy(v_renderer);
-	wlr_backend_destroy(v_backend);
-	wl_display_destroy(v_display);
+	t_output* p;
+	t_output* q;
+	wl_list_for_each_safe(p, q, &v_outputs, v_link) delete p;
 }
 
 void t_server::f_blur_text_input()
