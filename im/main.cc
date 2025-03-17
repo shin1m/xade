@@ -28,7 +28,7 @@ class t_context : public t_engine
 	uint32_t v_serial = 0;
 	SkFont v_font;
 	SkFontMetrics v_metrics;
-	t_surface v_surface;
+	t_surface v_surface{false};
 	t_owner<zwp_input_popup_surface_v2*, zwp_input_popup_surface_v2_destroy> v_popup;
 	sk_sp<GrDirectContext> v_sk_context;
 	sk_sp<SkSurface> v_sk_surface;

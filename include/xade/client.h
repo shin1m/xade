@@ -184,7 +184,7 @@ class t_surface
 
 	t_owner<wl_surface*, wl_surface_destroy> v_surface;
 	EGLConfig v_egl_config;
-	EGLContext v_egl_context = EGL_NO_CONTEXT;
+	EGLContext v_egl_context;
 	wl_egl_window* v_egl_window = NULL;
 	EGLSurface v_egl_surface = EGL_NO_SURFACE;
 	wl_callback* v_frame = NULL;
@@ -207,7 +207,7 @@ public:
 	std::function<void()> v_on_input_disable;
 	std::function<void()> v_on_input_done;
 
-	t_surface();
+	t_surface(bool a_depth);
 	~t_surface();
 	operator wl_surface*() const
 	{
@@ -265,7 +265,7 @@ public:
 	std::function<void()> v_on_unmap;
 	std::function<void()> v_on_close;
 
-	t_frame();
+	t_frame(bool a_depth);
 	~t_frame();
 	operator xdg_toplevel*() const
 	{

@@ -255,7 +255,7 @@ wl_callback_listener t_surface::v_frame_listener = {
 	}
 };
 
-t_surface::t_surface() : v_surface(wl_compositor_create_surface(f_client()))
+t_surface::t_surface(bool a_depth) : v_surface(wl_compositor_create_surface(f_client()))
 {
 	if (!v_surface) throw std::runtime_error("surface");
 	wl_surface_set_user_data(v_surface, this);
@@ -266,6 +266,7 @@ t_surface::t_surface() : v_surface(wl_compositor_create_surface(f_client()))
 			EGL_GREEN_SIZE, 8,
 			EGL_BLUE_SIZE, 8,
 			EGL_ALPHA_SIZE, 8,
+			EGL_DEPTH_SIZE, a_depth ? 16 : 0,
 			EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
 			EGL_NONE
 		};
@@ -392,7 +393,7 @@ void t_frame::f_resize()
 		f_request_frame();
 }
 
-t_frame::t_frame() : v_xdg_surface(xdg_wm_base_get_xdg_surface(f_client(), *this))
+t_frame::t_frame(bool a_depth) : t_surface(a_depth), v_xdg_surface(xdg_wm_base_get_xdg_surface(f_client(), *this))
 {
 	if (!v_xdg_surface) throw std::runtime_error("xdg surface");
 	xdg_surface_add_listener(v_xdg_surface, &v_xdg_surface_listener, this);

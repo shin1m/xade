@@ -47,7 +47,7 @@ class t_window
 	SkGlyphID v_bar_glyphs[2];
 	size_t v_width;
 	size_t v_height;
-	t_frame v_frame;
+	t_frame v_frame{false};
 	t_decoration v_decoration;
 	std::list<std::function<void()>>::iterator v_idle = f_client().v_on_idle.end();
 	std::vector<wchar_t> v_preedit_text;

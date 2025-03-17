@@ -27,7 +27,7 @@ public:
 	std::function<void()> v_on_unmap;
 	std::function<void()> v_on_closed;
 
-	t_layered(zwlr_layer_shell_v1* a_shell, wl_output* a_output, uint32_t a_layer, const char* a_namespace);
+	t_layered(zwlr_layer_shell_v1* a_shell, wl_output* a_output, uint32_t a_layer, const char* a_namespace, bool a_depth);
 	~t_layered();
 	operator zwlr_layer_surface_v1*() const
 	{
@@ -88,7 +88,7 @@ void t_layered::f_configure(uint32_t a_serial, uint32_t a_width, uint32_t a_heig
 		f_request_frame();
 }
 
-t_layered::t_layered(zwlr_layer_shell_v1* a_shell, wl_output* a_output, uint32_t a_layer, const char* a_namespace)
+t_layered::t_layered(zwlr_layer_shell_v1* a_shell, wl_output* a_output, uint32_t a_layer, const char* a_namespace, bool a_depth) : t_surface(a_depth)
 {
 	v_layer_surface = zwlr_layer_shell_v1_get_layer_surface(a_shell, *this, a_output, a_layer, a_namespace);
 	if (!v_layer_surface) throw std::runtime_error("layer surface");
@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
 	});
 	if (!shell) throw std::runtime_error("layer shell");
 	t_cursor cursor("default");
-	t_layered background(shell, NULL, ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND, "");
+	t_layered background(shell, NULL, ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND, "", false);
 	zwlr_layer_shell_v1_destroy(shell);
 	sk_sp<GrDirectContext> context;
 	sk_sp<SkSurface> surface;
