@@ -83,6 +83,9 @@ class t_library : public xemmai::t_library
 {
 	t_slot_of<t_type> v_type_client;
 	t_slot_of<t_type> v_type_surface;
+	t_slot_of<t_type> v_type_frame_state;
+	t_slot_of<t_type> v_type_frame_wm_capabilities;
+	t_slot_of<t_type> v_type_frame_resize_edge;
 	t_slot_of<t_type> v_type_frame;
 	t_slot_of<t_type> v_type_cursor;
 	t_slot_of<t_type> v_type_input;
@@ -97,6 +100,9 @@ public:
 XEMMAI__LIBRARY__BASE(t_library, t_global, f_global())
 XEMMAI__LIBRARY__TYPE(t_library, client)
 XEMMAI__LIBRARY__TYPE(t_library, surface)
+XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_state, frame_state)
+XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_wm_capabilities, frame_wm_capabilities)
+XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_resize_edge, frame_resize_edge)
 XEMMAI__LIBRARY__TYPE(t_library, frame)
 XEMMAI__LIBRARY__TYPE(t_library, cursor)
 XEMMAI__LIBRARY__TYPE(t_library, input)

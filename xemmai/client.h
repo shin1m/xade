@@ -298,6 +298,30 @@ struct t_type_of<xemmaix::xade::t_surface> : t_derivable<t_bears<xemmaix::xade::
 };
 
 template<>
+struct t_type_of<xdg_toplevel_state> : t_enum_of<xdg_toplevel_state, xemmaix::xade::t_library>
+{
+	static t_object* f_define(t_library* a_library);
+
+	using t_base::t_base;
+};
+
+template<>
+struct t_type_of<xdg_toplevel_wm_capabilities> : t_enum_of<xdg_toplevel_wm_capabilities, xemmaix::xade::t_library>
+{
+	static t_object* f_define(t_library* a_library);
+
+	using t_base::t_base;
+};
+
+template<>
+struct t_type_of<xdg_toplevel_resize_edge> : t_enum_of<xdg_toplevel_resize_edge, xemmaix::xade::t_library>
+{
+	static t_object* f_define(t_library* a_library);
+
+	using t_base::t_base;
+};
+
+template<>
 struct t_type_of<xemmaix::xade::t_frame> : t_derivable<t_bears<xemmaix::xade::t_frame, t_type_of<xemmaix::xade::t_surface>>>
 {
 	static void f_define(t_library* a_library);

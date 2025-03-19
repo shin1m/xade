@@ -50,6 +50,9 @@ void t_library::f_scan(t_scan a_scan)
 {
 	a_scan(v_type_client);
 	a_scan(v_type_surface);
+	a_scan(v_type_frame_state);
+	a_scan(v_type_frame_wm_capabilities);
+	a_scan(v_type_frame_resize_edge);
 	a_scan(v_type_frame);
 	a_scan(v_type_cursor);
 	a_scan(v_type_input);
@@ -65,6 +68,9 @@ std::vector<std::pair<t_root, t_rvalue>> t_library::f_define()
 	return t_define(this)
 		(L"Client"sv, static_cast<t_object*>(v_type_client))
 		(L"Surface"sv, static_cast<t_object*>(v_type_surface))
+		(L"FrameState"sv, t_type_of<xdg_toplevel_state>::f_define(this))
+		(L"FrameWMCapabilities"sv, t_type_of<xdg_toplevel_wm_capabilities>::f_define(this))
+		(L"FrameResizeEdge"sv, t_type_of<xdg_toplevel_resize_edge>::f_define(this))
 		(L"Frame"sv, static_cast<t_object*>(v_type_frame))
 		(L"Cursor"sv, static_cast<t_object*>(v_type_cursor))
 		(L"Input"sv, static_cast<t_object*>(v_type_input))

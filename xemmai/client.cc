@@ -52,6 +52,55 @@ t_pvalue t_type_of<xemmaix::xade::t_surface>::f_do_construct(t_pvalue* a_stack, 
 	return t_construct<bool>::t_bind<xemmaix::xade::t_surface>::f_do(this, a_stack, a_n);
 }
 
+t_object* t_type_of<xdg_toplevel_state>::f_define(t_library* a_library)
+{
+	return t_base::f_define(a_library, [](auto a_fields)
+	{
+		a_fields
+		(L"MAXIMIZED", XDG_TOPLEVEL_STATE_MAXIMIZED)
+		(L"FULLSCREEN", XDG_TOPLEVEL_STATE_FULLSCREEN)
+		(L"RESIZING", XDG_TOPLEVEL_STATE_RESIZING)
+		(L"ACTIVATED", XDG_TOPLEVEL_STATE_ACTIVATED)
+		(L"TILED_LEFT", XDG_TOPLEVEL_STATE_TILED_LEFT)
+		(L"TILED_RIGHT", XDG_TOPLEVEL_STATE_TILED_RIGHT)
+		(L"TILED_TOP", XDG_TOPLEVEL_STATE_TILED_TOP)
+		(L"TILED_BOTTOM", XDG_TOPLEVEL_STATE_TILED_BOTTOM)
+		(L"SUSPENDED", XDG_TOPLEVEL_STATE_SUSPENDED)
+		;
+	});
+}
+
+t_object* t_type_of<xdg_toplevel_wm_capabilities>::f_define(t_library* a_library)
+{
+	return t_base::f_define(a_library, [](auto a_fields)
+	{
+		a_fields
+		(L"WINDOW_MENU", XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU)
+		(L"MAXIMIZE", XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE)
+		(L"FULLSCREEN", XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN)
+		(L"MINIMIZE", XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE)
+		;
+	});
+}
+
+t_object* t_type_of<xdg_toplevel_resize_edge>::f_define(t_library* a_library)
+{
+	return t_base::f_define(a_library, [](auto a_fields)
+	{
+		a_fields
+		(L"NONE", XDG_TOPLEVEL_RESIZE_EDGE_NONE)
+		(L"TOP", XDG_TOPLEVEL_RESIZE_EDGE_TOP)
+		(L"BOTTOM", XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM)
+		(L"LEFT", XDG_TOPLEVEL_RESIZE_EDGE_LEFT)
+		(L"TOP_LEFT", XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT)
+		(L"BOTTOM_LEFT", XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT)
+		(L"RIGHT", XDG_TOPLEVEL_RESIZE_EDGE_RIGHT)
+		(L"TOP_RIGHT", XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT)
+		(L"BOTTOM_RIGHT", XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT)
+		;
+	});
+}
+
 void t_type_of<xemmaix::xade::t_frame>::f_define(t_library* a_library)
 {
 	using xemmaix::xade::t_frame;
@@ -61,8 +110,8 @@ void t_type_of<xemmaix::xade::t_frame>::f_define(t_library* a_library)
 		(L"on_unmap")
 		(L"on_close")
 		(L"swap_buffers"sv, t_member<void(t_frame::*)(), &t_frame::f_swap_buffers>())
-		//(L"is"sv, t_member<bool(t_frame::*)(xdg_toplevel_state), &t_frame::f_is>())
-		//(L"has"sv, t_member<bool(t_frame::*)(xdg_toplevel_wm_capabilities), &t_frame::f_has>())
+		(L"is"sv, t_member<bool(t_frame::*)(xdg_toplevel_state), &t_frame::f_is>())
+		(L"has"sv, t_member<bool(t_frame::*)(xdg_toplevel_wm_capabilities), &t_frame::f_has>())
 		(L"show_window_menu"sv, t_member<void(t_frame::*)(int32_t, int32_t), &t_frame::f_show_window_menu>())
 		(L"move"sv, t_member<void(t_frame::*)(), &t_frame::f_move>())
 		(L"resize"sv,
