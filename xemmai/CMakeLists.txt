@@ -5,11 +5,7 @@ function(add_module name)
 endfunction()
 add_module(xade
 	client.cc
-	#surface.cc
-	#frame.cc
-	#cursor.cc
-	#input.cc
-	#symbol.cc
+	layered.cc
 	xade.cc
 )
 #add_module(xadeskia xadeskia.cc)

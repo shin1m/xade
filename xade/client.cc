@@ -94,7 +94,7 @@ wl_pointer_listener t_client::v_pointer_listener = {
 	[](auto a_data, auto a_this, auto a_time, auto a_axis, auto a_value)
 	{
 		if (auto focus = static_cast<t_client*>(a_data)->v_pointer_focus)
-			if (auto& on = focus->v_on_scroll) on(a_axis, wl_fixed_to_double(a_value));
+			if (auto& on = focus->v_on_scroll) on(static_cast<wl_pointer_axis>(a_axis), wl_fixed_to_double(a_value));
 	},
 	[](auto a_data, auto a_this)
 	{
