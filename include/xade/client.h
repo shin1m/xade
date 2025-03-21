@@ -77,7 +77,7 @@ public:
 	}
 };
 
-#pragma push
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsubobject-linkage"
 
 class t_client
@@ -197,7 +197,7 @@ public:
 	std::function<void()> v_on_pointer_move;
 	std::function<void(uint32_t)> v_on_button_press;
 	std::function<void(uint32_t)> v_on_button_release;
-	std::function<void(uint32_t, double)> v_on_scroll;
+	std::function<void(wl_pointer_axis, double)> v_on_scroll;
 	std::function<void()> v_on_focus_enter;
 	std::function<void()> v_on_focus_leave;
 	std::function<void(xkb_keysym_t, char32_t)> v_on_key_press;
@@ -297,7 +297,7 @@ public:
 		auto& client = f_client();
 		xdg_toplevel_move(v_xdg_toplevel, client, client.v_action_serial);
 	}
-	void f_resize(uint32_t a_edges)
+	void f_resize(xdg_toplevel_resize_edge a_edges)
 	{
 		auto& client = f_client();
 		xdg_toplevel_resize(v_xdg_toplevel, client, client.v_action_serial, a_edges);
@@ -380,7 +380,7 @@ public:
 	}
 };
 
-#pragma pop
+#pragma GCC diagnostic pop
 
 }
 

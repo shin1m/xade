@@ -18,6 +18,17 @@ void t_type_of<xemmaix::xade::t_client>::f_define(t_library* a_library)
 	.f_derive<t_client, t_object>();
 }
 
+t_object* t_type_of<wl_pointer_axis>::f_define(t_library* a_library)
+{
+	return t_base::f_define(a_library, [](auto a_fields)
+	{
+		a_fields
+		(L"SCROLL", WL_POINTER_AXIS_VERTICAL_SCROLL)
+		(L"SCROLL", WL_POINTER_AXIS_HORIZONTAL_SCROLL)
+		;
+	});
+}
+
 void t_type_of<xemmaix::xade::t_surface>::f_define(t_library* a_library)
 {
 	using xemmaix::xade::t_surface;
@@ -37,6 +48,7 @@ void t_type_of<xemmaix::xade::t_surface>::f_define(t_library* a_library)
 		(L"on_input_enable")
 		(L"on_input_disable")
 		(L"on_input_done")
+		(L"commit"sv, t_member<void(t_surface::*)(), &t_surface::f_commit>())
 		(L"create"sv, t_member<void(t_surface::*)(size_t, size_t), &t_surface::f_create>())
 		(L"destroy"sv, t_member<void(t_surface::*)(), &t_surface::f_destroy>())
 		(L"make_current"sv, t_member<void(t_surface::*)(), &t_surface::f_make_current>())
@@ -115,7 +127,7 @@ void t_type_of<xemmaix::xade::t_frame>::f_define(t_library* a_library)
 		(L"show_window_menu"sv, t_member<void(t_frame::*)(int32_t, int32_t), &t_frame::f_show_window_menu>())
 		(L"move"sv, t_member<void(t_frame::*)(), &t_frame::f_move>())
 		(L"resize"sv,
-		 	t_member<void(t_frame::*)(uint32_t), &t_frame::f_resize>(),
+		 	t_member<void(t_frame::*)(xdg_toplevel_resize_edge), &t_frame::f_resize>(),
 		 	t_member<void(t_frame::*)(int32_t, int32_t), &t_frame::f_resize>()
 		)
 	.f_derive<t_frame, xemmaix::xade::t_surface>();

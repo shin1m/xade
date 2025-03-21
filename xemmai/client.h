@@ -45,7 +45,7 @@ struct t_client
 		XEMMAIX__XADE__ON(pointer_move, , 3, )\
 		XEMMAIX__XADE__ON(button_press, (auto a_button), 4, a_button)\
 		XEMMAIX__XADE__ON(button_release, (auto a_button), 5, a_button)\
-		XEMMAIX__XADE__ON(scroll, (auto a_axis, auto a_value), 6, a_axis, a_value)\
+		XEMMAIX__XADE__ON(scroll, (auto a_axis, auto a_value), 6, t_object::f_of(this)->f_type()->v_module->f_as<t_library>().f_as(a_axis), a_value)\
 		XEMMAIX__XADE__ON(focus_enter, , 7, )\
 		XEMMAIX__XADE__ON(focus_leave, , 8, )\
 		XEMMAIX__XADE__ON(key_press, (auto a_sym, auto a_c), 9, a_sym, a_c)\
@@ -60,6 +60,11 @@ struct t_surface : t_proxy_of<::xade::t_surface>
 	t_surface(bool a_depth) : t_base(a_depth)
 	{
 		XEMMAIX__XADE__SURFACE__ONS
+	}
+	void f_commit()
+	{
+		f_check();
+		wl_surface_commit(*this);
 	}
 	void f_create(size_t a_width, size_t a_height)
 	{
@@ -144,7 +149,7 @@ struct t_frame : t_proxy_of<::xade::t_frame>
 		f_check();
 		::xade::t_frame::f_move();
 	}
-	void f_resize(uint32_t a_edges)
+	void f_resize(xdg_toplevel_resize_edge a_edges)
 	{
 		f_check();
 		::xade::t_frame::f_resize(a_edges);
@@ -282,6 +287,14 @@ struct t_type_of<xemmaix::xade::t_client> : t_uninstantiatable<t_bears<xemmaix::
 	using t_library = xemmaix::xade::t_library;
 
 	static void f_define(t_library* a_library);
+
+	using t_base::t_base;
+};
+
+template<>
+struct t_type_of<wl_pointer_axis> : t_enum_of<wl_pointer_axis, xemmaix::xade::t_library>
+{
+	static t_object* f_define(t_library* a_library);
 
 	using t_base::t_base;
 };

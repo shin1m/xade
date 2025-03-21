@@ -162,7 +162,7 @@ void t_decoration::f_hook(t_frame& a_frame)
 				break;
 			}
 			if (edges)
-				a_frame.f_resize(edges);
+				a_frame.f_resize(static_cast<xdg_toplevel_resize_edge>(edges));
 			else
 				a_frame.f_move();
 			return;
