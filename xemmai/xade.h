@@ -16,10 +16,13 @@ protected:
 	t_entry* v_previous;
 	t_entry* v_next;
 
-	t_entry(bool) : v_previous(this), v_next(this)
+	t_entry() : v_previous(this), v_next(this)
 	{
 	}
-	t_entry();
+	t_entry(t_entry* a_previous) : v_previous(a_previous), v_next(a_previous->v_next)
+	{
+		v_previous->v_next = v_next->v_previous = this;
+	}
 
 public:
 	virtual void f_dispose();
@@ -52,15 +55,19 @@ public:
 class t_proxy : t_entry
 {
 protected:
-	t_session* v_session = t_session::f_instance();
+	t_session* v_session = static_cast<t_session*>(v_previous);
 	t_root v_object = t_object::f_of(this);
 
-	virtual void f_dispose();
+	t_proxy() : t_entry(t_session::f_instance())
+	{
+	}
 	void f_check()
 	{
 		if (v_session != t_session::f_instance()) f_throw(L"not valid."sv);
-		if (!v_object) f_throw(L"already destroyed."sv);
 	}
+
+public:
+	virtual void f_dispose();
 };
 
 template<typename T>
@@ -90,6 +97,7 @@ class t_library : public xemmai::t_library
 {
 	t_slot_of<t_type> v_type_client;
 	t_slot_of<t_type> v_type_pointer_axis;
+	t_slot_of<t_type> v_type_proxy;
 	t_slot_of<t_type> v_type_surface;
 	t_slot_of<t_type> v_type_frame_state;
 	t_slot_of<t_type> v_type_frame_wm_capabilities;
@@ -112,6 +120,7 @@ public:
 XEMMAI__LIBRARY__BASE(t_library, t_global, f_global())
 XEMMAI__LIBRARY__TYPE(t_library, client)
 XEMMAI__LIBRARY__TYPE_AS(t_library, wl_pointer_axis, pointer_axis)
+XEMMAI__LIBRARY__TYPE(t_library, proxy)
 XEMMAI__LIBRARY__TYPE(t_library, surface)
 XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_state, frame_state)
 XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_wm_capabilities, frame_wm_capabilities)
@@ -123,6 +132,21 @@ XEMMAI__LIBRARY__TYPE_AS(t_library, zwlr_layer_shell_v1_layer, layer)
 XEMMAI__LIBRARY__TYPE_AS(t_library, zwlr_layer_surface_v1_anchor, anchor)
 XEMMAI__LIBRARY__TYPE_AS(t_library, zwlr_layer_surface_v1_keyboard_interactivity, keyboard_interactivity)
 XEMMAI__LIBRARY__TYPE(t_library, layered)
+
+}
+
+namespace xemmai
+{
+
+template<>
+struct t_type_of<xemmaix::xade::t_proxy> : t_bears<xemmaix::xade::t_proxy>
+{
+	using t_library = xemmaix::xade::t_library;
+
+	static void f_define(t_library* a_library);
+
+	using t_base::t_base;
+};
 
 }
 

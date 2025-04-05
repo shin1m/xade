@@ -37,8 +37,8 @@ target_link_libraries(xadeskia
 	skia
 )
 install(FILES
-	${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client.h
-	${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-client.h
+	${CMAKE_CURRENT_BINARY_DIR}/xdg-shell.h
+	${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3.h
 	${CMAKE_CURRENT_BINARY_DIR}/wlr-layer-shell-unstable-v1.h
 	DESTINATION include/xade
 )

@@ -300,10 +300,8 @@ struct t_type_of<wl_pointer_axis> : t_enum_of<wl_pointer_axis, xemmaix::xade::t_
 };
 
 template<>
-struct t_type_of<xemmaix::xade::t_surface> : t_derivable<t_bears<xemmaix::xade::t_surface>>
+struct t_type_of<xemmaix::xade::t_surface> : t_derivable<t_bears<xemmaix::xade::t_surface, t_type_of<xemmaix::xade::t_proxy>>>
 {
-	using t_library = xemmaix::xade::t_library;
-
 	static void f_define(t_library* a_library);
 
 	using t_base::t_base;
@@ -344,7 +342,7 @@ struct t_type_of<xemmaix::xade::t_frame> : t_derivable<t_bears<xemmaix::xade::t_
 };
 
 template<>
-struct t_type_of<xemmaix::xade::t_cursor> : t_bears<xemmaix::xade::t_cursor>
+struct t_type_of<xemmaix::xade::t_cursor> : t_bears<xemmaix::xade::t_cursor, t_type_of<xemmaix::xade::t_proxy>>
 {
 	using t_base::t_base;
 	t_pvalue f_do_construct(t_pvalue* a_stack, size_t a_n);
@@ -357,10 +355,8 @@ struct t_fundamental<std::shared_ptr<xade::t_input>>
 };
 
 template<>
-struct t_type_of<xemmaix::xade::t_input> : t_uninstantiatable<t_bears<xemmaix::xade::t_input>>
+struct t_type_of<xemmaix::xade::t_input> : t_uninstantiatable<t_bears<xemmaix::xade::t_input, t_type_of<xemmaix::xade::t_proxy>>>
 {
-	using t_library = xemmaix::xade::t_library;
-
 	static t_pvalue f_transfer(const t_library* a_library, const std::shared_ptr<xade::t_input>& a_value)
 	{
 		if (!a_value) return nullptr;

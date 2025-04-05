@@ -23,8 +23,8 @@ t_object* t_type_of<wl_pointer_axis>::f_define(t_library* a_library)
 	return t_base::f_define(a_library, [](auto a_fields)
 	{
 		a_fields
-		(L"SCROLL", WL_POINTER_AXIS_VERTICAL_SCROLL)
-		(L"SCROLL", WL_POINTER_AXIS_HORIZONTAL_SCROLL)
+		(L"VERTICAL_SCROLL"sv, WL_POINTER_AXIS_VERTICAL_SCROLL)
+		(L"HORIZONTAL_SCROLL"sv, WL_POINTER_AXIS_HORIZONTAL_SCROLL)
 		;
 	});
 }
@@ -33,21 +33,21 @@ void t_type_of<xemmaix::xade::t_surface>::f_define(t_library* a_library)
 {
 	using xemmaix::xade::t_surface;
 	t_define{a_library}
-		(L"on_frame")
-		(L"on_pointer_enter")
-		(L"on_pointer_leave")
-		(L"on_pointer_move")
-		(L"on_button_press")
-		(L"on_button_release")
-		(L"on_scroll")
-		(L"on_focus_enter")
-		(L"on_focus_leave")
-		(L"on_key_press")
-		(L"on_key_release")
-		(L"on_key_repeat")
-		(L"on_input_enable")
-		(L"on_input_disable")
-		(L"on_input_done")
+		(L"on_frame"sv)
+		(L"on_pointer_enter"sv)
+		(L"on_pointer_leave"sv)
+		(L"on_pointer_move"sv)
+		(L"on_button_press"sv)
+		(L"on_button_release"sv)
+		(L"on_scroll"sv)
+		(L"on_focus_enter"sv)
+		(L"on_focus_leave"sv)
+		(L"on_key_press"sv)
+		(L"on_key_release"sv)
+		(L"on_key_repeat"sv)
+		(L"on_input_enable"sv)
+		(L"on_input_disable"sv)
+		(L"on_input_done"sv)
 		(L"commit"sv, t_member<void(t_surface::*)(), &t_surface::f_commit>())
 		(L"create"sv, t_member<void(t_surface::*)(size_t, size_t), &t_surface::f_create>())
 		(L"destroy"sv, t_member<void(t_surface::*)(), &t_surface::f_destroy>())
@@ -56,7 +56,7 @@ void t_type_of<xemmaix::xade::t_surface>::f_define(t_library* a_library)
 		(L"request_frame"sv, t_member<void(t_surface::*)(), &t_surface::f_request_frame>())
 		(L"input"sv, t_member<const std::shared_ptr<::xade::t_input>&(t_surface::*)(), &t_surface::f_input>())
 		(L"input__"sv, t_member<void(t_surface::*)(const std::shared_ptr<::xade::t_input>&), &t_surface::f_input__>())
-	.f_derive<t_surface, t_object>();
+	.f_derive<t_surface, xemmaix::xade::t_proxy>();
 }
 
 t_pvalue t_type_of<xemmaix::xade::t_surface>::f_do_construct(t_pvalue* a_stack, size_t a_n)
@@ -69,15 +69,15 @@ t_object* t_type_of<xdg_toplevel_state>::f_define(t_library* a_library)
 	return t_base::f_define(a_library, [](auto a_fields)
 	{
 		a_fields
-		(L"MAXIMIZED", XDG_TOPLEVEL_STATE_MAXIMIZED)
-		(L"FULLSCREEN", XDG_TOPLEVEL_STATE_FULLSCREEN)
-		(L"RESIZING", XDG_TOPLEVEL_STATE_RESIZING)
-		(L"ACTIVATED", XDG_TOPLEVEL_STATE_ACTIVATED)
-		(L"TILED_LEFT", XDG_TOPLEVEL_STATE_TILED_LEFT)
-		(L"TILED_RIGHT", XDG_TOPLEVEL_STATE_TILED_RIGHT)
-		(L"TILED_TOP", XDG_TOPLEVEL_STATE_TILED_TOP)
-		(L"TILED_BOTTOM", XDG_TOPLEVEL_STATE_TILED_BOTTOM)
-		(L"SUSPENDED", XDG_TOPLEVEL_STATE_SUSPENDED)
+		(L"MAXIMIZED"sv, XDG_TOPLEVEL_STATE_MAXIMIZED)
+		(L"FULLSCREEN"sv, XDG_TOPLEVEL_STATE_FULLSCREEN)
+		(L"RESIZING"sv, XDG_TOPLEVEL_STATE_RESIZING)
+		(L"ACTIVATED"sv, XDG_TOPLEVEL_STATE_ACTIVATED)
+		(L"TILED_LEFT"sv, XDG_TOPLEVEL_STATE_TILED_LEFT)
+		(L"TILED_RIGHT"sv, XDG_TOPLEVEL_STATE_TILED_RIGHT)
+		(L"TILED_TOP"sv, XDG_TOPLEVEL_STATE_TILED_TOP)
+		(L"TILED_BOTTOM"sv, XDG_TOPLEVEL_STATE_TILED_BOTTOM)
+		(L"SUSPENDED"sv, XDG_TOPLEVEL_STATE_SUSPENDED)
 		;
 	});
 }
@@ -87,10 +87,10 @@ t_object* t_type_of<xdg_toplevel_wm_capabilities>::f_define(t_library* a_library
 	return t_base::f_define(a_library, [](auto a_fields)
 	{
 		a_fields
-		(L"WINDOW_MENU", XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU)
-		(L"MAXIMIZE", XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE)
-		(L"FULLSCREEN", XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN)
-		(L"MINIMIZE", XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE)
+		(L"WINDOW_MENU"sv, XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU)
+		(L"MAXIMIZE"sv, XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE)
+		(L"FULLSCREEN"sv, XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN)
+		(L"MINIMIZE"sv, XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE)
 		;
 	});
 }
@@ -100,15 +100,15 @@ t_object* t_type_of<xdg_toplevel_resize_edge>::f_define(t_library* a_library)
 	return t_base::f_define(a_library, [](auto a_fields)
 	{
 		a_fields
-		(L"NONE", XDG_TOPLEVEL_RESIZE_EDGE_NONE)
-		(L"TOP", XDG_TOPLEVEL_RESIZE_EDGE_TOP)
-		(L"BOTTOM", XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM)
-		(L"LEFT", XDG_TOPLEVEL_RESIZE_EDGE_LEFT)
-		(L"TOP_LEFT", XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT)
-		(L"BOTTOM_LEFT", XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT)
-		(L"RIGHT", XDG_TOPLEVEL_RESIZE_EDGE_RIGHT)
-		(L"TOP_RIGHT", XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT)
-		(L"BOTTOM_RIGHT", XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT)
+		(L"NONE"sv, XDG_TOPLEVEL_RESIZE_EDGE_NONE)
+		(L"TOP"sv, XDG_TOPLEVEL_RESIZE_EDGE_TOP)
+		(L"BOTTOM"sv, XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM)
+		(L"LEFT"sv, XDG_TOPLEVEL_RESIZE_EDGE_LEFT)
+		(L"TOP_LEFT"sv, XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT)
+		(L"BOTTOM_LEFT"sv, XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT)
+		(L"RIGHT"sv, XDG_TOPLEVEL_RESIZE_EDGE_RIGHT)
+		(L"TOP_RIGHT"sv, XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT)
+		(L"BOTTOM_RIGHT"sv, XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT)
 		;
 	});
 }
@@ -117,10 +117,10 @@ void t_type_of<xemmaix::xade::t_frame>::f_define(t_library* a_library)
 {
 	using xemmaix::xade::t_frame;
 	t_define{a_library}
-		(L"on_measure")
-		(L"on_map")
-		(L"on_unmap")
-		(L"on_close")
+		(L"on_measure"sv)
+		(L"on_map"sv)
+		(L"on_unmap"sv)
+		(L"on_close"sv)
 		(L"swap_buffers"sv, t_member<void(t_frame::*)(), &t_frame::f_swap_buffers>())
 		(L"is"sv, t_member<bool(t_frame::*)(xdg_toplevel_state), &t_frame::f_is>())
 		(L"has"sv, t_member<bool(t_frame::*)(xdg_toplevel_wm_capabilities), &t_frame::f_has>())
@@ -153,7 +153,7 @@ void t_type_of<xemmaix::xade::t_input>::f_define(t_library* a_library)
 		(L"text"sv, t_member<t_pvalue(t_input::*)(), &t_input::f_text>())
 		(L"delete"sv, t_member<t_pvalue(t_input::*)(), &t_input::f_delete>())
 		(L"spot"sv, t_member<void(t_input::*)(int32_t, int32_t, int32_t, int32_t), &t_input::f_spot>())
-	.f_derive<t_input, t_object>();
+	.f_derive<t_input, xemmaix::xade::t_proxy>();
 }
 
 }
