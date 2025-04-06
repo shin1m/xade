@@ -27,46 +27,6 @@ struct t_layered : t_proxy_of<::xade::t_layered>
 		XEMMAIX__XADE__ON(unmap, , 17, )
 		XEMMAIX__XADE__ON(closed, , 18, )
 	}
-	void f_swap_buffers()
-	{
-		f_check();
-		::xade::t_layered::f_swap_buffers();
-	}
-	void f_set_size(uint32_t a_width, uint32_t a_height)
-	{
-		f_check();
-		zwlr_layer_surface_v1_set_size(*this, a_width, a_height);
-	}
-	void f_set_anchor(uint32_t a_anchor)
-	{
-		f_check();
-		zwlr_layer_surface_v1_set_anchor(*this, a_anchor);
-	}
-	void f_set_exclusive_zone(int32_t a_zone)
-	{
-		f_check();
-		zwlr_layer_surface_v1_set_exclusive_zone(*this, a_zone);
-	}
-	void f_set_margin(int32_t a_top, int32_t a_right, int32_t a_bottom, int32_t a_left)
-	{
-		f_check();
-		zwlr_layer_surface_v1_set_margin(*this, a_top, a_right, a_bottom, a_left);
-	}
-	void f_set_keyboard_interactivity(zwlr_layer_surface_v1_keyboard_interactivity a_interactivity)
-	{
-		f_check();
-		zwlr_layer_surface_v1_set_keyboard_interactivity(*this, a_interactivity);
-	}
-	void f_set_layer(zwlr_layer_shell_v1_layer a_layer)
-	{
-		f_check();
-		zwlr_layer_surface_v1_set_layer(*this, a_layer);
-	}
-	void f_set_exclusive_edge(uint32_t a_anchor)
-	{
-		f_check();
-		zwlr_layer_surface_v1_set_exclusive_edge(*this, a_anchor);
-	}
 };
 
 }
@@ -96,6 +56,12 @@ struct t_type_of<zwlr_layer_surface_v1_keyboard_interactivity> : t_enum_of<zwlr_
 	static t_object* f_define(t_library* a_library);
 
 	using t_base::t_base;
+};
+
+template<>
+struct t_fundamental<xade::t_layered>
+{
+	using t_type = xemmaix::xade::t_layered;
 };
 
 template<>

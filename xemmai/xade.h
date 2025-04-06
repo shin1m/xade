@@ -61,13 +61,13 @@ protected:
 	t_proxy() : t_entry(t_session::f_instance())
 	{
 	}
-	void f_check()
-	{
-		if (v_session != t_session::f_instance()) f_throw(L"not valid."sv);
-	}
 
 public:
 	virtual void f_dispose();
+	bool f_valid()
+	{
+		return v_session == t_session::f_instance() && v_object;
+	}
 };
 
 template<typename T>
@@ -141,6 +141,38 @@ namespace xemmai
 template<>
 struct t_type_of<xemmaix::xade::t_proxy> : t_bears<xemmaix::xade::t_proxy>
 {
+	template<typename T>
+	static T& f_cast(auto&& a_object)
+	{
+		auto& p = static_cast<t_object*>(a_object)->f_as<T>();
+		if (!p.f_valid()) f_throw(L"not valid."sv);
+		return p;
+	}
+	template<typename T>
+	struct t_cast
+	{
+		static T f_as(auto&& a_object)
+		{
+			return std::forward<T>(f_cast<typename t_fundamental<T>::t_type>(std::forward<decltype(a_object)>(a_object)));
+		}
+		static bool f_is(t_object* a_object)
+		{
+			return reinterpret_cast<uintptr_t>(a_object) >= c_tag__OBJECT && a_object->f_type()->f_derives<typename t_fundamental<T>::t_type>();
+		}
+	};
+	template<typename T>
+	struct t_cast<T*>
+	{
+		static T* f_as(auto&& a_object)
+		{
+			return static_cast<t_object*>(a_object) ? &f_cast<typename t_fundamental<T>::t_type>(std::forward<decltype(a_object)>(a_object)) : nullptr;
+		}
+		static bool f_is(t_object* a_object)
+		{
+			return reinterpret_cast<uintptr_t>(a_object) == c_tag__NULL || reinterpret_cast<uintptr_t>(a_object) >= c_tag__OBJECT && a_object->f_type()->f_derives<typename t_fundamental<T>::t_type>();
+		}
+	};
+
 	using t_library = xemmaix::xade::t_library;
 
 	static void f_define(t_library* a_library);

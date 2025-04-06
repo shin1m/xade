@@ -48,14 +48,17 @@ void t_type_of<xemmaix::xade::t_surface>::f_define(t_library* a_library)
 		(L"on_input_enable"sv)
 		(L"on_input_disable"sv)
 		(L"on_input_done"sv)
-		(L"commit"sv, t_member<void(t_surface::*)(), &t_surface::f_commit>())
-		(L"create"sv, t_member<void(t_surface::*)(size_t, size_t), &t_surface::f_create>())
-		(L"destroy"sv, t_member<void(t_surface::*)(), &t_surface::f_destroy>())
-		(L"make_current"sv, t_member<void(t_surface::*)(), &t_surface::f_make_current>())
-		(L"swap_buffers"sv, t_member<void(t_surface::*)(), &t_surface::f_swap_buffers>())
-		(L"request_frame"sv, t_member<void(t_surface::*)(), &t_surface::f_request_frame>())
-		(L"input"sv, t_member<const std::shared_ptr<::xade::t_input>&(t_surface::*)(), &t_surface::f_input>())
-		(L"input__"sv, t_member<void(t_surface::*)(const std::shared_ptr<::xade::t_input>&), &t_surface::f_input__>())
+		(L"commit"sv, t_member<void(*)(t_surface&), [](auto a_this)
+		{
+			wl_surface_commit(a_this);
+		}>())
+		(L"create"sv, t_member<void(xade::t_surface::*)(size_t, size_t), &t_surface::f_create>())
+		(L"destroy"sv, t_member<void(xade::t_surface::*)(), &t_surface::f_destroy>())
+		(L"make_current"sv, t_member<void(xade::t_surface::*)(), &t_surface::f_make_current>())
+		(L"swap_buffers"sv, t_member<void(xade::t_surface::*)(), &t_surface::f_swap_buffers>())
+		(L"request_frame"sv, t_member<void(xade::t_surface::*)(), &t_surface::f_request_frame>())
+		(L"input"sv, t_member<const std::shared_ptr<xade::t_input>&(xade::t_surface::*)() const, &t_surface::f_input>())
+		(L"input__"sv, t_member<void(xade::t_surface::*)(const std::shared_ptr<xade::t_input>&), &t_surface::f_input__>())
 	.f_derive<t_surface, xemmaix::xade::t_proxy>();
 }
 
@@ -121,14 +124,14 @@ void t_type_of<xemmaix::xade::t_frame>::f_define(t_library* a_library)
 		(L"on_map"sv)
 		(L"on_unmap"sv)
 		(L"on_close"sv)
-		(L"swap_buffers"sv, t_member<void(t_frame::*)(), &t_frame::f_swap_buffers>())
-		(L"is"sv, t_member<bool(t_frame::*)(xdg_toplevel_state), &t_frame::f_is>())
-		(L"has"sv, t_member<bool(t_frame::*)(xdg_toplevel_wm_capabilities), &t_frame::f_has>())
-		(L"show_window_menu"sv, t_member<void(t_frame::*)(int32_t, int32_t), &t_frame::f_show_window_menu>())
-		(L"move"sv, t_member<void(t_frame::*)(), &t_frame::f_move>())
+		(L"swap_buffers"sv, t_member<void(xade::t_frame::*)(), &t_frame::f_swap_buffers>())
+		(L"is"sv, t_member<bool(xade::t_frame::*)(xdg_toplevel_state) const, &t_frame::f_is>())
+		(L"has"sv, t_member<bool(xade::t_frame::*)(xdg_toplevel_wm_capabilities) const, &t_frame::f_has>())
+		(L"show_window_menu"sv, t_member<void(xade::t_frame::*)(int32_t, int32_t), &t_frame::f_show_window_menu>())
+		(L"move"sv, t_member<void(xade::t_frame::*)(), &t_frame::f_move>())
 		(L"resize"sv,
-		 	t_member<void(t_frame::*)(xdg_toplevel_resize_edge), &t_frame::f_resize>(),
-		 	t_member<void(t_frame::*)(int32_t, int32_t), &t_frame::f_resize>()
+		 	t_member<void(xade::t_frame::*)(xdg_toplevel_resize_edge), &t_frame::f_resize>(),
+		 	t_member<void(xade::t_frame::*)(int32_t, int32_t), &t_frame::f_resize>()
 		)
 	.f_derive<t_frame, xemmaix::xade::t_surface>();
 }
@@ -147,12 +150,25 @@ void t_type_of<xemmaix::xade::t_input>::f_define(t_library* a_library)
 {
 	using xemmaix::xade::t_input;
 	t_define{a_library}
-		(L"done"sv, t_member<bool(t_input::*)(), &t_input::f_done>())
-		(L"commit"sv, t_member<void(t_input::*)(), &t_input::f_commit>())
-		(L"preedit"sv, t_member<t_pvalue(t_input::*)(), &t_input::f_preedit>())
-		(L"text"sv, t_member<t_pvalue(t_input::*)(), &t_input::f_text>())
-		(L"delete"sv, t_member<t_pvalue(t_input::*)(), &t_input::f_delete>())
-		(L"spot"sv, t_member<void(t_input::*)(int32_t, int32_t, int32_t, int32_t), &t_input::f_spot>())
+		(L"done"sv, t_member<bool(*)(const std::shared_ptr<xade::t_input>&), [](auto a_this)
+		{
+			return a_this->f_done();
+		}>())
+		(L"commit"sv, t_member<void(*)(const std::shared_ptr<xade::t_input>&), [](auto a_this)
+		{
+			a_this->f_commit();
+		}>())
+		(L"preedit"sv, t_member<t_object*(t_input::*)(), &t_input::f_preedit>())
+		(L"text"sv, t_member<t_object*(t_input::*)(), &t_input::f_text>())
+		(L"delete"sv, t_member<t_object*(*)(const std::shared_ptr<xade::t_input>&), [](auto a_this)
+		{
+			auto [before, after] = a_this->f_delete();
+			return f_tuple(before, after);
+		}>())
+		(L"spot"sv, t_member<void(*)(const std::shared_ptr<xade::t_input>&, int32_t, int32_t, int32_t, int32_t), [](auto a_this, auto a_x, auto a_y, auto a_width, auto a_height)
+		{
+			zwp_text_input_v3_set_cursor_rectangle(*a_this, a_x, a_y, a_width, a_height);
+		}>())
 	.f_derive<t_input, xemmaix::xade::t_proxy>();
 }
 

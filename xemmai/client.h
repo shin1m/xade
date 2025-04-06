@@ -13,8 +13,7 @@ struct t_client
 
 	void f_check()
 	{
-		if (v_client != t_session::f_instance()) f_throw(L"not valid."sv);
-		if (!v_client) f_throw(L"already destroyed."sv);
+		if (!v_client || v_client != t_session::f_instance()) f_throw(L"not valid."sv);
 	}
 	t_object* f_pointer_focus();
 	t_object* f_pointer()
@@ -61,46 +60,6 @@ struct t_surface : t_proxy_of<::xade::t_surface>
 	{
 		XEMMAIX__XADE__SURFACE__ONS
 	}
-	void f_commit()
-	{
-		f_check();
-		wl_surface_commit(*this);
-	}
-	void f_create(size_t a_width, size_t a_height)
-	{
-		f_check();
-		::xade::t_surface::f_create(a_width, a_height);
-	}
-	void f_destroy()
-	{
-		f_check();
-		::xade::t_surface::f_destroy();
-	}
-	void f_make_current()
-	{
-		f_check();
-		::xade::t_surface::f_make_current();
-	}
-	void f_swap_buffers()
-	{
-		f_check();
-		::xade::t_surface::f_swap_buffers();
-	}
-	void f_request_frame()
-	{
-		f_check();
-		::xade::t_surface::f_request_frame();
-	}
-	const std::shared_ptr<::xade::t_input>& f_input()
-	{
-		f_check();
-		return ::xade::t_surface::f_input();
-	}
-	void f_input__(const std::shared_ptr<::xade::t_input>& a_input)
-	{
-		f_check();
-		return ::xade::t_surface::f_input__(a_input);
-	}
 };
 
 struct t_frame : t_proxy_of<::xade::t_frame>
@@ -123,41 +82,6 @@ struct t_frame : t_proxy_of<::xade::t_frame>
 		XEMMAIX__XADE__ON(map, (auto a_width, auto a_height), 16, a_width, a_height)
 		XEMMAIX__XADE__ON(unmap, , 17, )
 		XEMMAIX__XADE__ON(close, , 18, )
-	}
-	void f_swap_buffers()
-	{
-		f_check();
-		::xade::t_frame::f_swap_buffers();
-	}
-	bool f_is(xdg_toplevel_state a_state)
-	{
-		f_check();
-		return ::xade::t_frame::f_is(a_state);
-	}
-	bool f_has(xdg_toplevel_wm_capabilities a_capability)
-	{
-		f_check();
-		return ::xade::t_frame::f_has(a_capability);
-	}
-	void f_show_window_menu(int32_t a_x, int32_t a_y)
-	{
-		f_check();
-		::xade::t_frame::f_show_window_menu(a_x, a_y);
-	}
-	void f_move()
-	{
-		f_check();
-		::xade::t_frame::f_move();
-	}
-	void f_resize(xdg_toplevel_resize_edge a_edges)
-	{
-		f_check();
-		::xade::t_frame::f_resize(a_edges);
-	}
-	void f_resize(int32_t a_width, int32_t a_height)
-	{
-		f_check();
-		::xade::t_frame::f_resize(a_width, a_height);
 	}
 };
 
@@ -189,19 +113,8 @@ struct t_input : t_proxy_of<std::shared_ptr<::xade::t_input>>
 		v_session->v_objects.erase(get());
 		t_base::f_dispose();
 	}
-	bool f_done()
+	t_object* f_preedit()
 	{
-		f_check();
-		return get()->f_done();
-	}
-	void f_commit()
-	{
-		f_check();
-		get()->f_commit();
-	}
-	t_pvalue f_preedit()
-	{
-		f_check();
 		auto [text, begin, end] = get()->f_preedit();
 		if (begin > end) return f_tuple(nullptr, begin, end);
 		auto p = text.c_str();
@@ -225,24 +138,12 @@ struct t_input : t_proxy_of<std::shared_ptr<::xade::t_input>>
 		}
 		return f_tuple(static_cast<t_object*>(s), b, e);
 	}
-	t_pvalue f_text()
+	t_object* f_text()
 	{
-		f_check();
 		t_stringer s;
 		auto& text = get()->f_text();
 		v_utf8towc(text.c_str(), text.size(), f_appender(s));
-		return static_cast<t_object*>(s);
-	}
-	t_pvalue f_delete()
-	{
-		f_check();
-		auto [before, after] = get()->f_delete();
-		return f_tuple(before, after);
-	}
-	void f_spot(int32_t a_x, int32_t a_y, int32_t a_width, int32_t a_height)
-	{
-		f_check();
-		zwp_text_input_v3_set_cursor_rectangle(*get(), a_x, a_y, a_width, a_height);
+		return s;
 	}
 };
 
@@ -300,6 +201,12 @@ struct t_type_of<wl_pointer_axis> : t_enum_of<wl_pointer_axis, xemmaix::xade::t_
 };
 
 template<>
+struct t_fundamental<xade::t_surface>
+{
+	using t_type = xemmaix::xade::t_surface;
+};
+
+template<>
 struct t_type_of<xemmaix::xade::t_surface> : t_derivable<t_bears<xemmaix::xade::t_surface, t_type_of<xemmaix::xade::t_proxy>>>
 {
 	static void f_define(t_library* a_library);
@@ -330,6 +237,12 @@ struct t_type_of<xdg_toplevel_resize_edge> : t_enum_of<xdg_toplevel_resize_edge,
 	static t_object* f_define(t_library* a_library);
 
 	using t_base::t_base;
+};
+
+template<>
+struct t_fundamental<xade::t_frame>
+{
+	using t_type = xemmaix::xade::t_frame;
 };
 
 template<>
