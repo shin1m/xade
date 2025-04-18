@@ -110,8 +110,6 @@ class t_library : public xemmai::t_library
 	t_slot_of<t_type> v_type_keyboard_interactivity;
 	t_slot_of<t_type> v_type_layered;
 
-	static void f_main(t_library* a_library, const t_pvalue& a_callable);
-
 public:
 	using xemmai::t_library::t_library;
 	XEMMAI__LIBRARY__MEMBERS
