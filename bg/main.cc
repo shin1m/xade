@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 	};
 	background.v_on_pointer_enter = [&]
 	{
-		f_client().f_cursor__(&cursor);
+		client.f_cursor__(&cursor);
 	};
 	zwlr_layer_surface_v1_set_anchor(background, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
 	wl_surface_commit(background);
