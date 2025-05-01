@@ -96,7 +96,9 @@ struct t_layered;
 class t_library : public xemmai::t_library
 {
 	t_slot_of<t_type> v_type_client;
+	t_slot_of<t_type> v_type_button;
 	t_slot_of<t_type> v_type_pointer_axis;
+	t_slot_of<t_type> v_type_key;
 	t_slot_of<t_type> v_type_proxy;
 	t_slot_of<t_type> v_type_surface;
 	t_slot_of<t_type> v_type_frame_state;
