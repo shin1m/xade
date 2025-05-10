@@ -27,15 +27,16 @@ void t_layered::f_configure(uint32_t a_serial, uint32_t a_width, uint32_t a_heig
 	if (map) {
 		if (a_width <= 0 || a_height <= 0) return ack();
 		f_create(a_width, a_height);
+	} else if (a_width <= 0 || a_height <= 0) {
+		if (auto& on = v_on_unmap) on();
+		f_destroy();
+		return ack();
 	} else {
-		int width;
-		int height;
-		wl_egl_window_get_attached_size(*this, &width, &height);
-		if (a_width == width && a_height == height) return ack();
-		if (a_width <= 0 || a_height <= 0) {
-			if (auto& on = v_on_unmap) on();
-			f_destroy();
-			return ack();
+		if (!v_configuring) {
+			int width;
+			int height;
+			wl_egl_window_get_attached_size(*this, &width, &height);
+			if (a_width == width && a_height == height) return ack();
 		}
 		wl_egl_window_resize(*this, a_width, a_height, 0, 0);
 	}

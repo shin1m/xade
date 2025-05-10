@@ -373,15 +373,16 @@ void t_frame::f_resize()
 	if (map) {
 		if (v_width <= 0 || v_height <= 0) return ack();
 		f_create(v_width, v_height);
+	} else if (v_width <= 0 || v_height <= 0) {
+		if (auto& on = v_on_unmap) on();
+		f_destroy();
+		return ack();
 	} else {
-		int width;
-		int height;
-		wl_egl_window_get_attached_size(*this, &width, &height);
-		if (v_width == width && v_height == height) return ack();
-		if (v_width <= 0 || v_height <= 0) {
-			if (auto& on = v_on_unmap) on();
-			f_destroy();
-			return ack();
+		if (!v_configuring) {
+			int width;
+			int height;
+			wl_egl_window_get_attached_size(*this, &width, &height);
+			if (v_width == width && v_height == height) return ack();
 		}
 		wl_egl_window_resize(*this, v_width, v_height, 0, 0);
 		if (f_is(XDG_TOPLEVEL_STATE_MAXIMIZED)) map = true;

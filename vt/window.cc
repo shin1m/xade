@@ -499,7 +499,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	{
 		v_frame.f_make_current();
 		if (v_surface) {
-			v_surface.reset();
+			if (a_width != v_surface->width() || a_height != v_surface->height()) v_surface.reset();
 		} else {
 			glGenRenderbuffers(1, &v_renderbuffer);
 			glBindRenderbuffer(GL_RENDERBUFFER, v_renderbuffer);
@@ -508,8 +508,10 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, v_renderbuffer);
 			v_context = skia::f_new_direct_context();
 		}
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, a_width, a_height);
-		v_surface = skia::f_new_surface(v_context.get(), v_framebuffer, a_width, a_height);
+		if (!v_surface) {
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, a_width, a_height);
+			v_surface = skia::f_new_surface(v_context.get(), v_framebuffer, a_width, a_height);
+		}
 		auto frame = v_decoration.v_theme.f_frame(v_frame);
 		v_width = a_width - v_decoration.v_theme.v_unit.fWidth - frame.fLeft - frame.fRight;
 		v_height = a_height - frame.fTop - frame.fBottom;

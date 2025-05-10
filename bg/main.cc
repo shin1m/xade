@@ -35,11 +35,11 @@ int main(int argc, char* argv[])
 	background.v_on_map = [&](auto a_width, auto a_height)
 	{
 		background.f_make_current();
-		if (surface)
-			surface.reset();
-		else
+		if (!surface)
 			context = skia::f_new_direct_context();
-		surface = skia::f_new_surface(context.get(), 0, a_width, a_height);
+		else if (a_width != surface->width() || a_height != surface->height())
+			surface.reset();
+		if (!surface) surface = skia::f_new_surface(context.get(), 0, a_width, a_height);
 	};
 	background.v_on_unmap = [&]
 	{

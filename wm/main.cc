@@ -40,12 +40,34 @@ extern "C"
 
 using xade::t_owner;
 
+struct t_server;
 struct t_input_method;
 struct t_text_input;
 
 struct t_focusable
 {
 	virtual void f_focus() = 0;
+};
+
+struct t_output
+{
+	wl_list v_link;
+	t_server* v_server;
+	wlr_output* v_output;
+	wl_listener v_frame;
+	wl_listener v_commit;
+	wl_listener v_request_state;
+	wl_listener v_destroy;
+	wlr_scene_tree* v_layers[4];
+
+	t_output(t_server* a_server, wlr_output* a_output);
+	~t_output()
+	{
+		for (auto p : v_layers) wlr_scene_node_destroy(&p->node);
+		wl_list_remove(&v_link);
+		wl_list_remove(&v_destroy.link);
+	}
+	void f_configure(zwlr_layer_shell_v1_layer a_layer);
 };
 
 struct t_server
@@ -113,6 +135,12 @@ struct t_server
 
 	t_server();
 	~t_server();
+	t_output* f_first_output() const
+	{
+		t_output* p;
+		wl_list_for_each(p, &v_outputs, v_link) return p;
+		throw std::runtime_error("no output");
+	}
 	wlr_scene_surface* f_surface_at_cursor(double* a_sx, double* a_sy)
 	{
 		auto node = wlr_scene_node_at(&v_scene->tree.node, v_cursor->x, v_cursor->y, a_sx, a_sy);
@@ -144,28 +172,14 @@ struct t_server
 		v_on_cursor_button = v_on_cursor_button_grab;
 		f_pointer_motion(nullptr);
 	}
-	void f_blur_text_input();
-};
-
-struct t_output
-{
-	wl_list v_link;
-	t_server* v_server;
-	wlr_output* v_output;
-	wl_listener v_frame;
-	wl_listener v_commit;
-	wl_listener v_request_state;
-	wl_listener v_destroy;
-	wlr_scene_tree* v_layers[4];
-
-	t_output(t_server* a_server, wlr_output* a_output);
-	~t_output()
+	void f_emit_cursor_motion()
 	{
-		for (auto p : v_layers) wlr_scene_node_destroy(&p->node);
-		wl_list_remove(&v_link);
-		wl_list_remove(&v_destroy.link);
+		wlr_seat_pointer_warp(v_seat, NAN, NAN);
+		timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		v_on_cursor_motion(static_cast<int64_t>(now.tv_sec) * 1000 + now.tv_nsec / 1000000);
 	}
-	void f_configure(zwlr_layer_shell_v1_layer a_layer);
+	void f_blur_text_input();
 };
 
 struct t_toplevel : t_focusable
@@ -183,6 +197,8 @@ struct t_toplevel : t_focusable
 	wl_listener v_request_resize;
 	wl_listener v_request_maximize;
 	wl_listener v_request_fullscreen;
+	wl_listener v_output_commit;
+	wl_listener v_output_destroy;
 	static void f_on_commit_none()
 	{
 	};
@@ -191,6 +207,8 @@ struct t_toplevel : t_focusable
 	{
 	};
 	std::function<void(uint32_t)> v_on_ack_configure = f_on_ack_configure_none;
+	wlr_box v_restore;
+	wlr_scene_rect* v_fullscreen = nullptr;
 
 	t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel);
 	~t_toplevel()
@@ -200,6 +218,7 @@ struct t_toplevel : t_focusable
 		wl_list_remove(&v_commit.link);
 		wl_list_remove(&v_ack_configure.link);
 		wl_list_remove(&v_destroy.link);
+		f_detach_output();
 	}
 	virtual void f_focus()
 	{
@@ -213,6 +232,98 @@ struct t_toplevel : t_focusable
 		wl_list_insert(&v_server->v_toplevels, &v_link);
 		wlr_xdg_toplevel_set_activated(v_toplevel, true);
 		if (auto p = wlr_seat_get_keyboard(seat)) wlr_seat_keyboard_notify_enter(seat, surface, p->keycodes, p->num_keycodes, &p->modifiers);
+	}
+	void f_detach_output()
+	{
+		if (!v_output_commit.link.next) return;
+		wl_list_remove(&v_output_commit.link);
+		wl_list_remove(&v_output_destroy.link);
+	}
+	void f_try_save_geometry()
+	{
+		if (auto& x = v_toplevel->current; x.maximized || x.fullscreen) return;
+		wlr_xdg_surface_get_geometry(v_toplevel->base, &v_restore);
+		v_restore.x += v_scene_tree->node.x;
+		v_restore.y += v_scene_tree->node.y;
+	}
+	void f_resize(int32_t a_width, int32_t a_height, auto a_do)
+	{
+		v_on_ack_configure = [this, a_do, serial = wlr_xdg_toplevel_set_size(v_toplevel, a_width, a_height)](auto a_serial)
+		{
+			v_on_commit = [this, a_do]
+			{
+				a_do();
+				v_on_commit = f_on_commit_none;
+			};
+			if (a_serial >= serial) v_on_ack_configure = f_on_ack_configure_none;
+		};
+	}
+	void f_restore()
+	{
+		f_detach_output();
+		v_output_commit.link.next = NULL;
+		f_resize(v_restore.width, v_restore.height, [this]
+		{
+			wlr_scene_node_set_position(&v_scene_tree->node, v_restore.x, v_restore.y);
+			if (v_fullscreen) {
+				wlr_scene_node_destroy(&v_fullscreen->node);
+				v_fullscreen = nullptr;
+			}
+			v_server->f_emit_cursor_motion();
+		});
+	}
+	wlr_output* f_primary_output() const
+	{
+		wlr_output* output = NULL;
+		wlr_scene_node_for_each_buffer(&v_scene_tree->node, [](auto a_buffer, auto, auto, auto a_data)
+		{
+			auto p = static_cast<wlr_output**>(a_data);
+			if (!*p) if (auto q = a_buffer->primary_output) *p = q->output;
+		}, &output);
+		return output ? output : v_server->f_first_output()->v_output;
+	}
+	void f_maximize()
+	{
+		auto output = f_primary_output();
+		f_detach_output();
+		wl_signal_add(&output->events.commit, &v_output_commit);
+		wl_signal_add(&output->events.destroy, &v_output_destroy);
+		wlr_box box;
+		wlr_output_layout_get_box(v_server->v_output_layout, output, &box);
+		f_resize(box.width, box.height, [this, box]
+		{
+			wlr_box resized;
+			wlr_xdg_surface_get_geometry(v_toplevel->base, &resized);
+			wlr_scene_node_set_position(&v_scene_tree->node, (box.width - resized.width) / 2, (box.height - resized.height) / 2);
+			if (v_fullscreen) {
+				wlr_scene_node_destroy(&v_fullscreen->node);
+				v_fullscreen = nullptr;
+			}
+			v_server->f_emit_cursor_motion();
+		});
+	}
+	void f_fullscreen(wlr_output* a_output)
+	{
+		if (!a_output) a_output = f_primary_output();
+		f_detach_output();
+		wl_signal_add(&a_output->events.commit, &v_output_commit);
+		wl_signal_add(&a_output->events.destroy, &v_output_destroy);
+		wlr_box box;
+		wlr_output_layout_get_box(v_server->v_output_layout, a_output, &box);
+		f_resize(box.width, box.height, [this, box]
+		{
+			wlr_box resized;
+			wlr_xdg_surface_get_geometry(v_toplevel->base, &resized);
+			wlr_scene_node_set_position(&v_scene_tree->node, (box.width - resized.width) / 2, (box.height - resized.height) / 2);
+			if (v_fullscreen) {
+				wlr_scene_rect_set_size(v_fullscreen, box.width, box.height);
+			} else {
+				float color[] = {0.0f, 0.0f, 0.0f, 1.0f};
+				v_fullscreen = wlr_scene_rect_create(v_scene_tree, box.width, box.height, color);
+				wlr_scene_node_lower_to_bottom(&v_fullscreen->node);
+			}
+			v_server->f_emit_cursor_motion();
+		});
 	}
 };
 
@@ -518,7 +629,10 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	v_commit.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_commit);
-		if (self->v_toplevel->base->initial_commit) wlr_xdg_toplevel_set_size(self->v_toplevel, 0, 0);
+		if (self->v_toplevel->base->initial_commit) {
+			wlr_xdg_toplevel_set_wm_capabilities(self->v_toplevel, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE | WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
+			wlr_xdg_toplevel_set_size(self->v_toplevel, 0, 0);
+		}
 		self->v_on_commit();
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.commit, &v_commit);
@@ -555,7 +669,12 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 		// TODO: check the serial.
 		t_toplevel* self = wl_container_of(a_listener, self, v_request_resize);
 		auto server = self->v_server;
-		server->f_on_unmap_ungrab(self->v_toplevel->base->surface);
+		server->v_on_unmap = [self, server](auto a_unmapped)
+		{
+			if (a_unmapped->surface != self->v_toplevel->base->surface) return;
+			wlr_xdg_toplevel_set_resizing(self->v_toplevel, false);
+			server->f_ungrab_pointer();
+		};
 		wlr_box box;
 		wlr_xdg_surface_get_geometry(self->v_toplevel->base, &box);
 		box.x += self->v_scene_tree->node.x;
@@ -571,39 +690,71 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 			int right = edges & WLR_EDGE_RIGHT ? x + cursor->x : box.x + box.width;
 			int top = edges & WLR_EDGE_TOP ? y + cursor->y : box.y;
 			int bottom = edges & WLR_EDGE_BOTTOM ? y + cursor->y : box.y + box.height;
-			self->v_on_ack_configure = [self, box, edges,
-				serial = wlr_xdg_toplevel_set_size(self->v_toplevel, std::max(right - left, 1), std::max(bottom - top, 1))
-			](auto a_serial)
+			self->f_resize(std::max(right - left, 1), std::max(bottom - top, 1), [self, box, edges]
 			{
-				self->v_on_commit = [self, box, edges]
-				{
-					wlr_box resized;
-					wlr_xdg_surface_get_geometry(self->v_toplevel->base, &resized);
-					wlr_scene_node_set_position(&self->v_scene_tree->node,
-						(edges & WLR_EDGE_LEFT ? box.x + box.width - resized.width : box.x) - resized.x,
-						(edges & WLR_EDGE_TOP ? box.y + box.height - resized.height : box.y) - resized.y
-					);
-					self->v_on_commit = f_on_commit_none;
-				};
-				if (a_serial >= serial) self->v_on_ack_configure = f_on_ack_configure_none;
-			};
+				wlr_box resized;
+				wlr_xdg_surface_get_geometry(self->v_toplevel->base, &resized);
+				wlr_scene_node_set_position(&self->v_scene_tree->node,
+					(edges & WLR_EDGE_LEFT ? box.x + box.width - resized.width : box.x) - resized.x,
+					(edges & WLR_EDGE_TOP ? box.y + box.height - resized.height : box.y) - resized.y
+				);
+			});
 		};
-		server->v_on_cursor_button = server->v_on_cursor_button_ungrab;
+		server->v_on_cursor_button = [self, server](auto a_state)
+		{
+			if (a_state != WL_POINTER_BUTTON_STATE_RELEASED) return;
+			wlr_xdg_toplevel_set_resizing(self->v_toplevel, false);
+			server->f_ungrab_pointer();
+		};
 		wlr_seat_pointer_clear_focus(server->v_seat);
+		wlr_xdg_toplevel_set_resizing(self->v_toplevel, true);
 	};
 	wl_signal_add(&v_toplevel->events.request_resize, &v_request_resize);
 	v_request_maximize.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_request_maximize);
-		if (self->v_toplevel->base->initialized) wlr_xdg_surface_schedule_configure(self->v_toplevel->base);
+		if (!self->v_toplevel->base->initialized) return;
+		self->f_try_save_geometry();
+		auto maximized = self->v_toplevel->requested.maximized;
+		wlr_xdg_toplevel_set_maximized(self->v_toplevel, maximized);
+		if (self->v_toplevel->current.fullscreen) return;
+		if (maximized)
+			self->f_maximize();
+		else
+			self->f_restore();
 	};
 	wl_signal_add(&v_toplevel->events.request_maximize, &v_request_maximize);
 	v_request_fullscreen.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_request_fullscreen);
-		if (self->v_toplevel->base->initialized) wlr_xdg_surface_schedule_configure(self->v_toplevel->base);
+		if (!self->v_toplevel->base->initialized) return;
+		self->f_try_save_geometry();
+		auto fullscreen = self->v_toplevel->requested.fullscreen;
+		wlr_xdg_toplevel_set_fullscreen(self->v_toplevel, fullscreen);
+		if (fullscreen)
+			self->f_fullscreen(self->v_toplevel->requested.fullscreen_output);
+		else if (self->v_toplevel->current.maximized)
+			self->f_maximize();
+		else
+			self->f_restore();
 	};
 	wl_signal_add(&v_toplevel->events.request_fullscreen, &v_request_fullscreen);
+	v_output_commit.notify = [](auto a_listener, auto a_data)
+	{
+		auto event = static_cast<wlr_output_event_commit*>(a_data);
+		if (!(event->state->committed & WLR_OUTPUT_STATE_MODE)) return;
+		t_toplevel* self = wl_container_of(a_listener, self, v_output_commit);
+		if (self->v_toplevel->current.fullscreen)
+			self->f_fullscreen(NULL);
+		else
+			self->f_maximize();
+	};
+	v_output_commit.link.next = NULL;
+	v_output_destroy.notify = [](auto a_listener, auto a_data)
+	{
+		t_toplevel* self = wl_container_of(a_listener, self, v_output_destroy);
+		self->f_restore();
+	};
 }
 
 t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server), v_popup(a_popup)
@@ -632,13 +783,7 @@ t_popup::t_popup(t_server* a_server, wlr_xdg_popup* a_popup) : v_server(a_server
 
 t_layer_surface::t_layer_surface(t_server* a_server, wlr_layer_surface_v1* a_surface) : v_server(a_server), v_surface(a_surface)
 {
-	if (!v_surface->output) {
-		t_output* output;
-		wl_list_for_each(output, &v_server->v_outputs, v_link) {
-			v_surface->output = output->v_output;
-			break;
-		}
-	}
+	if (!v_surface->output) v_surface->output = v_server->f_first_output()->v_output;
 	v_commit.notify = [](auto a_listener, auto a_data)
 	{
 		t_layer_surface* self = wl_container_of(a_listener, self, v_commit);
@@ -846,7 +991,7 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	v_tree = wlr_scene_tree_create(&v_scene->tree);
 	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP] = wlr_scene_tree_create(&v_scene->tree);
 	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = wlr_scene_tree_create(&v_scene->tree);
-	v_xdg_shell = wlr_xdg_shell_create(v_display, 3);
+	v_xdg_shell = wlr_xdg_shell_create(v_display, 5);
 	wl_list_init(&v_toplevels);
 	v_new_xdg_toplevel.notify = [](auto a_listener, auto a_data)
 	{

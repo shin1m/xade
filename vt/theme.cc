@@ -40,20 +40,27 @@ t_decoration::t_part t_decoration::f_part(t_frame& a_frame) const
 	int width;
 	int height;
 	wl_egl_window_get_attached_size(a_frame, &width, &height);
+	auto y = f_client().f_pointer_y();
+	if (a_frame.f_is(XDG_TOPLEVEL_STATE_FULLSCREEN)) return y < 1 ? c_part__FULLSCREEN : c_part__CONTENT;
 	auto [b, c] = v_theme.f_border(a_frame);
 	auto x = f_client().f_pointer_x();
-	auto y = f_client().f_pointer_y();
 	if (x >= b && x < width - b && y >= b && y < height - b) {
 		if (y >= c) return c_part__CONTENT;
-		if (x < b + v_theme.v_unit.fWidth) return c_part__MENU;
+		if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU) && x < b + v_theme.v_unit.fWidth) return c_part__MENU;
 		auto bx = width - b - v_theme.v_unit.fWidth;
 		if (x >= bx) return c_part__CLOSE;
-		bx -= v_theme.v_unit.fWidth;
-		if (x >= bx) return c_part__FULLSCREEN;
-		bx -= v_theme.v_unit.fWidth;
-		if (x >= bx) return c_part__MAXIMIZE;
-		bx -= v_theme.v_unit.fWidth;
-		if (x >= bx) return c_part__MINIMIZE;
+		if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN)) {
+			bx -= v_theme.v_unit.fWidth;
+			if (x >= bx) return c_part__FULLSCREEN;
+		}
+		if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE)) {
+			bx -= v_theme.v_unit.fWidth;
+			if (x >= bx) return c_part__MAXIMIZE;
+		}
+		if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE)) {
+			bx -= v_theme.v_unit.fWidth;
+			if (x >= bx) return c_part__MINIMIZE;
+		}
 		return c_part__BAR;
 	}
 	auto part = [&](auto a_size, auto a_value)
@@ -67,6 +74,7 @@ void t_decoration::f_draw(t_frame& a_frame, SkCanvas& a_canvas, size_t a_width, 
 {
 	if (v_valid) return;
 	v_valid = true;
+	if (a_frame.f_is(XDG_TOPLEVEL_STATE_FULLSCREEN)) return;
 	SkPaint paint;
 	paint.setBlendMode(SkBlendMode::kSrc);
 	paint.setColor(v_theme.v_color_background);
@@ -76,13 +84,12 @@ void t_decoration::f_draw(t_frame& a_frame, SkCanvas& a_canvas, size_t a_width, 
 	a_canvas.drawIRect(SkIRect::MakeXYWH(0, c, b, height), paint);
 	a_canvas.drawIRect(SkIRect::MakeXYWH(a_width - b, c, b, height), paint);
 	a_canvas.drawIRect(SkIRect::MakeXYWH(0, a_height - b, a_width, b), paint);
-	paint.setColor(v_theme.v_color_hovered);
 	auto draw = [&](auto a_part, int32_t a_x, int32_t a_y)
 	{
 		auto hovered = a_part == v_hovered ? 1 : 0;
 		v_theme.f_draw(a_canvas, v_theme.f_glyphs()[a_part - c_part__MENU], a_x, a_y, v_pressed < c_part__CONTENT ? a_part == v_pressed ? hovered + 1 : 0 : hovered);
 	};
-	draw(c_part__MENU, b, b);
+	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU)) draw(c_part__MENU, b, b);
 	auto x = a_width - b - v_theme.v_unit.fWidth;
 	draw(c_part__CLOSE, x, b);
 	if (a_frame.f_has(XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN)) draw(c_part__FULLSCREEN, x -= v_theme.v_unit.fWidth, b);
