@@ -96,9 +96,9 @@ struct t_input : t_proxy_of<std::shared_ptr<::xade::t_input>>
 {
 	static auto f_appender(auto& a_s)
 	{
-		return [&](auto p, auto n)
+		return [&](auto a_p, auto a_n)
 		{
-			a_s << std::wstring_view(p, n);
+			a_s << std::wstring_view(a_p, a_n);
 		};
 	}
 

@@ -49,10 +49,10 @@ struct t_converter : private t_iconv
 	using t_iconv::t_iconv;
 	const C0* operator()(const C0* a_p, size_t a_n, auto a_out) const
 	{
-		auto p0 = reinterpret_cast<char*>(const_cast<C0*>(a_p));
-		size_t n0 = a_n * sizeof(C0);
-		auto e = f_to<C1>(&p0, &n0, a_out);
-		if (e == EINVAL) return reinterpret_cast<C0*>(p0);
+		auto p = reinterpret_cast<char*>(const_cast<C0*>(a_p));
+		size_t n = a_n * sizeof(C0);
+		auto e = f_to<C1>(&p, &n, a_out);
+		if (e == EINVAL) return reinterpret_cast<C0*>(p);
 		if (e == 0) e = f_to<C1>(nullptr, nullptr, a_out);
 		if (e == 0) return nullptr;
 		throw std::system_error(e, std::generic_category());

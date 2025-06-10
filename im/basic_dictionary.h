@@ -30,9 +30,9 @@ public:
 
 inline auto f_appender(auto& a_xs)
 {
-	return [&](auto p, auto n)
+	return [&](auto a_p, auto a_n)
 	{
-		a_xs.insert(a_xs.end(), p, p + n);
+		a_xs.insert(a_xs.end(), a_p, a_p + a_n);
 	};
 }
 

@@ -603,9 +603,9 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			const char* cs = v_buffer.f_code(code, i);
 			f_send(cs, std::strlen(cs));
 		} else if (a_c != L'\0') {
-			v_utf32tomb(&a_c, 1, [&](auto p, auto n)
+			v_utf32tomb(&a_c, 1, [&](auto a_p, auto a_n)
 			{
-				f_send(p, n);
+				f_send(a_p, a_n);
 			});
 		}
 	};
@@ -622,18 +622,18 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	v_frame.v_on_input_done = [&]
 	{
 		auto& text = v_frame.f_input()->f_text();
-		v_utf8tomb(text.c_str(), text.size(), [&](auto p, auto n)
+		v_utf8tomb(text.c_str(), text.size(), [&](auto a_p, auto a_n)
 		{
-			f_send(p, n);
+			f_send(a_p, a_n);
 		});
 		auto [preedit, begin, end] = v_frame.f_input()->f_preedit();
 		if (begin > end) return;
 		v_preedit_valid = false;
 		v_preedit_text.clear();
 		if (preedit.empty()) return;
-		auto append = [&](auto p, auto n)
+		auto append = [&](auto a_p, auto a_n)
 		{
-			v_preedit_text.insert(v_preedit_text.end(), p, p + n);
+			v_preedit_text.insert(v_preedit_text.end(), a_p, a_p + a_n);
 		};
 		auto p = preedit.c_str();
 		if (begin < 0) {
