@@ -11,7 +11,7 @@ pkg_check_modules(WAYLAND REQUIRED
 pkg_check_modules(WLROOTS REQUIRED
 	wayland-server
 	xkbcommon
-	wlroots-0.18
+	wlroots-0.19
 )
 pkg_get_variable(WAYLAND_PROTOCOLS wayland-protocols pkgdatadir)
 pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
