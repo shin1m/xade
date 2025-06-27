@@ -128,9 +128,11 @@ wl_keyboard_listener t_client::v_keyboard_listener = {
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_surface)
 	{
+		auto& self = *static_cast<t_client*>(a_data);
+		self.v_xkb.f_stop();
 		auto focus = static_cast<t_surface*>(wl_surface_get_user_data(a_surface));
 		if (auto& on = focus->v_on_focus_leave) on();
-		static_cast<t_client*>(a_data)->v_keyboard_focus = nullptr;
+		self.v_keyboard_focus = nullptr;
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_time, auto a_key, auto a_state)
 	{
