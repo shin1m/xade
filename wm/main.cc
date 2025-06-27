@@ -93,7 +93,6 @@ struct t_server
 	wlr_xdg_shell* v_xdg_shell;
 	wl_listener v_xdg_new_toplevel;
 	wl_listener v_xdg_new_popup;
-	wl_list v_toplevels;
 
 	wlr_layer_shell_v1* v_layer_shell;
 	wl_listener v_layer_new_surface;
@@ -144,6 +143,11 @@ struct t_server
 		wl_list_for_each(p, &v_outputs, v_link) return p;
 		throw std::runtime_error("no output");
 	}
+	wlr_scene_node* f_focused_node() const
+	{
+		auto p = v_seat->keyboard_state.focused_surface;
+		return p && (wlr_xdg_toplevel_try_from_wlr_surface(p) || wlr_layer_surface_v1_try_from_wlr_surface(p)) ? &static_cast<wlr_scene_tree*>(p->data)->node : nullptr;
+	}
 	wlr_scene_surface* f_surface_at_cursor(double* a_sx, double* a_sy)
 	{
 		auto node = wlr_scene_node_at(&v_scene->tree.node, v_cursor->x, v_cursor->y, a_sx, a_sy);
@@ -187,7 +191,6 @@ struct t_server
 
 struct t_toplevel : t_focusable
 {
-	wl_list v_link;
 	t_server* v_server;
 	wlr_xdg_toplevel* v_toplevel;
 	wlr_scene_tree* v_scene_tree;
@@ -234,9 +237,7 @@ struct t_toplevel : t_focusable
 		auto surface = v_toplevel->base->surface;
 		if (current == surface) return;
 		if (current) if (auto p = wlr_xdg_toplevel_try_from_wlr_surface(current)) wlr_xdg_toplevel_set_activated(p, false);
-		wlr_scene_node_raise_to_top(&v_scene_tree->node);
-		wl_list_remove(&v_link);
-		wl_list_insert(&v_server->v_toplevels, &v_link);
+		wlr_scene_node_set_enabled(&v_scene_tree->node, true);
 		wlr_xdg_toplevel_set_activated(v_toplevel, true);
 		if (auto p = wlr_seat_get_keyboard(seat)) wlr_seat_keyboard_notify_enter(seat, surface, p->keycodes, p->num_keycodes, &p->modifiers);
 	}
@@ -383,6 +384,7 @@ struct t_layer_surface : t_focusable
 		auto surface = v_surface->current.keyboard_interactive == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE ? NULL : v_surface->surface;
 		if (current == surface) return;
 		if (current) if (auto p = wlr_xdg_toplevel_try_from_wlr_surface(current)) wlr_xdg_toplevel_set_activated(p, false);
+		wlr_scene_node_set_enabled(&static_cast<wlr_scene_tree*>(v_surface->surface->data)->node, true);
 		if (!surface)
 			wlr_seat_keyboard_notify_clear_focus(seat);
 		else if (auto p = wlr_seat_get_keyboard(seat))
@@ -627,7 +629,6 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	v_map.notify = [](auto a_listener, auto a_data)
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_map);
-		wl_list_insert(&self->v_server->v_toplevels, &self->v_link);
 		self->f_focus();
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.map, &v_map);
@@ -635,7 +636,6 @@ t_toplevel::t_toplevel(t_server* a_server, wlr_xdg_toplevel* a_toplevel) : v_ser
 	{
 		t_toplevel* self = wl_container_of(a_listener, self, v_unmap);
 		self->v_server->v_on_unmap(self->v_toplevel->base);
-		wl_list_remove(&self->v_link);
 	};
 	wl_signal_add(&v_toplevel->base->surface->events.unmap, &v_unmap);
 	v_commit.notify = [](auto a_listener, auto a_data)
@@ -852,34 +852,112 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 	v_modifiers.notify = [](auto a_listener, auto a_data)
 	{
 		t_keyboard* self = wl_container_of(a_listener, self, v_modifiers);
-		if (auto p = self->v_server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
+		auto server = self->v_server;
+		if (auto p = server->f_focused_node()) if (!p->enabled) return;
+		if (auto p = server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
 			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
 			wlr_input_method_keyboard_grab_v2_send_modifiers(q, &self->v_keyboard->modifiers);
 			return;
 		}
-		wlr_seat_set_keyboard(self->v_server->v_seat, self->v_keyboard);
-		wlr_seat_keyboard_notify_modifiers(self->v_server->v_seat, &self->v_keyboard->modifiers);
+		auto seat = server->v_seat;
+		wlr_seat_set_keyboard(seat, self->v_keyboard);
+		wlr_seat_keyboard_notify_modifiers(seat, &self->v_keyboard->modifiers);
 	};
 	wl_signal_add(&v_keyboard->events.modifiers, &v_modifiers);
 	v_key.notify = [](auto a_listener, auto a_data)
 	{
 		t_keyboard* self = wl_container_of(a_listener, self, v_key);
 		auto server = self->v_server;
+		auto seat = server->v_seat;
 		auto event = static_cast<wlr_keyboard_key_event*>(a_data);
 		if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 			auto sym = xkb_state_key_get_one_sym(self->v_keyboard->xkb_state, event->keycode + 8);
-			if (wlr_keyboard_get_modifiers(self->v_keyboard) & WLR_MODIFIER_ALT)
+			if (wlr_keyboard_get_modifiers(self->v_keyboard) & WLR_MODIFIER_LOGO) {
+				auto find = [&](wl_list* a_link, wl_list* wl_list::* a_sibling) -> t_toplevel*
+				{
+					while (true) {
+						auto sibling = a_link->*a_sibling;
+						if (sibling == &server->v_tree->children) return nullptr;
+						wlr_scene_node* node = wl_container_of(sibling, node, link);
+						if (auto p = dynamic_cast<t_toplevel*>(static_cast<t_focusable*>(node->data))) return p;
+						a_link = sibling;
+					}
+				};
+				auto find_layer = [&](wlr_scene_tree* a_tree, wl_list* a_link, wl_list* wl_list::* a_sibling) -> t_focusable*
+				{
+					auto root = a_tree->node.parent;
+					while (true) {
+						while (true) {
+							auto sibling = a_link->*a_sibling;
+							if (sibling == &a_tree->children) break;
+							wlr_scene_node* node = wl_container_of(sibling, node, link);
+							if (auto p = static_cast<t_layer_surface*>(node->data); p && p->v_surface->current.keyboard_interactive != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) return p;
+							a_link = sibling;
+						}
+						auto sibling = a_tree->node.link.*a_sibling;
+						if (sibling == &root->children) return nullptr;
+						wlr_scene_node* node = wl_container_of(sibling, node, link);
+						a_tree = wlr_scene_tree_from_node(node);
+						a_link = &a_tree->children;
+					}
+				};
 				switch (sym) {
 				case XKB_KEY_Escape:
 					wl_display_terminate(server->v_display);
 					return;
-				case XKB_KEY_F1:
-					if (wl_list_length(&server->v_toplevels) > 1) {
-						t_toplevel* p = wl_container_of(server->v_toplevels.prev, p, v_link);
-						p->f_focus();
+				case XKB_KEY_space:
+				case XKB_KEY_h:
+					if (auto p = server->f_focused_node()) wlr_scene_node_set_enabled(p, !p->enabled);
+					return;
+				case XKB_KEY_j:
+					{
+						auto fs = seat->keyboard_state.focused_surface;
+						if (fs && wlr_layer_surface_v1_try_from_wlr_surface(fs)) {
+							auto& p = static_cast<wlr_scene_tree*>(fs->data)->node;
+							if (auto q = find_layer(p.parent, &p.link, &wl_list::prev)) q->f_focus();
+						} else if (auto p = find(fs && wlr_xdg_toplevel_try_from_wlr_surface(fs) ? &static_cast<wlr_scene_tree*>(fs->data)->node.link : &server->v_tree->children, &wl_list::prev)) {
+							p->f_focus();
+						} else if (auto tree = server->v_layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]; !wl_list_empty(&tree->children)) {
+							wlr_scene_node* node = wl_container_of(tree->children.prev, node, link);
+							tree = wlr_scene_tree_from_node(node);
+							if (auto p = find_layer(tree, &tree->children, &wl_list::prev)) p->f_focus();
+						}
+					}
+					return;
+				case XKB_KEY_k:
+					if (auto fs = seat->keyboard_state.focused_surface) {
+						if (auto p = wlr_xdg_toplevel_try_from_wlr_surface(fs)) {
+							if (auto q = find(&static_cast<wlr_scene_tree*>(fs->data)->node.link, &wl_list::next)) {
+								q->f_focus();
+							} else {
+								wlr_xdg_toplevel_set_activated(p, false);
+								wlr_seat_keyboard_notify_clear_focus(seat);
+							}
+						} else if (wlr_layer_surface_v1_try_from_wlr_surface(fs)) {
+							if (auto& node = static_cast<wlr_scene_tree*>(fs->data)->node; auto p = find_layer(node.parent, &node.link, &wl_list::next)) {
+								p->f_focus();
+							} else if (auto p = find(&server->v_tree->children, &wl_list::next)) {
+								p->f_focus();
+							} else {
+								wlr_seat_keyboard_notify_clear_focus(seat);
+							}
+						}
+					}
+					return;
+				case XKB_KEY_n:
+					if (auto p = server->f_focused_node()) if (p->link.prev != &p->parent->children) {
+						wlr_scene_node* sibling = wl_container_of(p->link.prev, sibling, link);
+						wlr_scene_node_place_below(p, sibling);
+					}
+					return;
+				case XKB_KEY_p:
+					if (auto p = server->f_focused_node()) if (p->link.next != &p->parent->children) {
+						wlr_scene_node* sibling = wl_container_of(p->link.next, sibling, link);
+						wlr_scene_node_place_above(p, sibling);
 					}
 					return;
 				}
+			}
 			if (sym == XKB_KEY_Kanji || sym == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
 				p->v_on ^= true;
 				if (p->v_on) {
@@ -893,12 +971,12 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 				return;
 			}
 		}
+		if (auto p = server->f_focused_node()) if (!p->enabled) return;
 		if (auto p = server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
 			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
 			wlr_input_method_keyboard_grab_v2_send_key(q, event->time_msec, event->keycode, event->state);
 			return;
 		}
-		auto seat = server->v_seat;
 		wlr_seat_set_keyboard(seat, self->v_keyboard);
 		wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
 	};
@@ -1002,7 +1080,6 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP] = wlr_scene_tree_create(&v_scene->tree);
 	v_layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = wlr_scene_tree_create(&v_scene->tree);
 	v_xdg_shell = wlr_xdg_shell_create(v_display, 5);
-	wl_list_init(&v_toplevels);
 	v_xdg_new_toplevel.notify = [](auto a_listener, auto a_data)
 	{
 		t_server* self = wl_container_of(a_listener, self, v_xdg_new_toplevel);
