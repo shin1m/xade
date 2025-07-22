@@ -44,11 +44,8 @@ class t_window
 	SkFont v_bold;
 	SkFontMetrics v_metrics;
 	SkISize v_unit;
-	SkGlyphID v_bar_glyphs[2];
 	size_t v_width;
 	size_t v_height;
-	t_frame v_frame{false};
-	t_decoration v_decoration;
 	std::list<std::function<void()>>::iterator v_idle = f_client().v_on_idle.end();
 	std::vector<wchar_t> v_preedit_text;
 	size_t v_preedit_begin;
@@ -80,7 +77,7 @@ class t_window
 	void f__invalidate(int a_y, unsigned a_height)
 	{
 		v_valid.op(SkIRect::MakeXYWH(0, a_y, v_width, a_height), SkRegion::kDifference_Op);
-		v_frame.f_request_frame();
+		v_host.v_surface.f_request_frame();
 	}
 	void f_invalidate(int a_y, unsigned a_height);
 	void f__scroll(int a_y, unsigned a_height, int a_dy);
@@ -101,7 +98,24 @@ class t_window
 	void f_input_state();
 
 public:
-	t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const SkFont& a_font, const t_theme& a_theme, const char* a_name);
+	struct t_host
+	{
+		t_surface& v_surface;
+		std::function<void(int32_t&, int32_t&)>& v_on_measure;
+		std::function<void(int32_t, int32_t)>& v_on_map;
+		std::function<void()>& v_on_unmap;
+		std::function<void()> v_swap_buffers;
+		std::function<SkIRect()> v_measure_frame;
+		std::function<void(SkCanvas&, size_t, size_t)> v_draw_frame;
+		const SkColor v_bar_color;
+		const SkISize v_bar_unit;
+		std::function<void(SkCanvas&, size_t, int, int, size_t)> v_draw_button;
+		const t_cursor& v_cursor_text;
+		const t_cursor& v_cursor_arrow;
+	};
+	t_host& v_host;
+
+	t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const SkFont& a_font, t_host& a_host);
 	~t_window();
 };
 

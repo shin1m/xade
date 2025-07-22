@@ -259,7 +259,7 @@ void t_window::f_draw_content(SkCanvas& a_canvas)
 		if (a.v_inverse) colors += 40;
 		paint.setColor(colors[a.v_foreground]);
 		unsigned width = wcwidth(c) * v_unit.fWidth;
-		if (&v_frame == f_client().f_keyboard_focus()) {
+		if (&v_host.v_surface == f_client().f_keyboard_focus()) {
 			a_canvas.drawIRect(SkIRect::MakeXYWH(x, y, width, uh), paint);
 			paint.setColor(colors[a.v_background]);
 			auto glyph = v_font.unicharToGlyph(c);
@@ -276,7 +276,7 @@ void t_window::f_draw_content(SkCanvas& a_canvas)
 void t_window::f_draw_bar(SkCanvas& a_canvas)
 {
 	int x = v_width;
-	auto bw = v_decoration.v_theme.v_unit.fWidth;
+	auto bw = v_host.v_bar_unit.fWidth;
 	auto content = f_content();
 	SkPaint paint;
 	paint.setBlendMode(SkBlendMode::kSrc);
@@ -285,8 +285,8 @@ void t_window::f_draw_bar(SkCanvas& a_canvas)
 		a_canvas.drawIRect(SkIRect::MakeXYWH(x, 0, bw, v_height), paint);
 		return;
 	}
-	paint.setColor(v_decoration.v_theme.v_color_background);
-	auto bh = v_decoration.v_theme.v_unit.fHeight;
+	paint.setColor(v_host.v_bar_color);
+	auto bh = v_host.v_bar_unit.fHeight;
 	if (v_height > bh * 3) {
 		unsigned gap = v_height - bh * 2;
 		unsigned thumb = static_cast<double>(gap) * v_height / content;
@@ -303,7 +303,7 @@ void t_window::f_draw_bar(SkCanvas& a_canvas)
 	auto draw = [&](auto a_part, auto a_y)
 	{
 		auto hovered = a_part == v_hovered ? 1 : 0;
-		v_decoration.v_theme.f_draw(a_canvas, v_bar_glyphs[a_part - c_part__BUTTON_UP], x, a_y, v_pressed != c_part__NONE ? a_part == v_pressed ? hovered + 1 : 0 : hovered);
+		v_host.v_draw_button(a_canvas, a_part - c_part__BUTTON_UP, x, a_y, v_pressed == c_part__NONE ? hovered : a_part == v_pressed ? hovered + 1 : 0);
 	};
 	draw(c_part__BUTTON_UP, 0);
 	draw(c_part__BUTTON_DOWN, v_height - bh);
@@ -318,9 +318,9 @@ void t_window::f__scroll(int a_y, unsigned a_height, int a_dy)
 	region.translate(0, a_dy);
 	region.op(bounds, SkRegion::kIntersect_Op);
 	v_valid.op(region, SkRegion::kUnion_Op);
-	v_frame.f_request_frame();
+	v_host.v_surface.f_request_frame();
 	if (region.isEmpty()) return;
-	auto frame = v_decoration.v_theme.f_frame(v_frame);
+	auto frame = v_host.v_measure_frame();
 	int sy1 = v_height - a_y + frame.fBottom;
 	int sy0 = sy1 - a_height;
 	int dy0 = sy0;
@@ -369,7 +369,7 @@ void t_window::f_log()
 {
 	v_position += v_unit.fHeight;
 	v_preedit_valid = v_bar_valid = false;
-	v_frame.f_request_frame();
+	v_host.v_surface.f_request_frame();
 	v_on_hover();
 }
 
@@ -387,7 +387,7 @@ void t_window::f_position__(int a_position)
 	v_on_hover();
 }
 
-t_window::t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const SkFont& a_font, const t_theme& a_theme, const char* a_name) :
+t_window::t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const SkFont& a_font, t_host& a_host) :
 v_buffer(*this, a_log, a_width, a_height), v_master(a_master),
 v_colors{
 	SkColorSetARGB(255, 255, 255, 255),
@@ -480,24 +480,22 @@ v_colors{
 },
 v_font(a_font), v_bold(a_font.makeWithSize(a_font.getSize())),
 v_unit(SkISize::Make(std::ceil(v_font.measureText(L"M", sizeof(wchar_t), SkTextEncoding::kUTF32, nullptr)), std::ceil(v_font.getMetrics(&v_metrics)))),
-v_decoration(a_theme),
+v_host(a_host),
 v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new SkPoint[a_width])
 {
-	SkUnichar cs[] = {L'\ue5c7', L'\ue5c5'};
-	v_decoration.v_theme.v_font.unicharsToGlyphs(cs, 2, v_bar_glyphs);
 	std::fill_n(v_positions, a_width, SkPoint::Make(0.0f, 0.0f));
 	v_bold.setEmbolden(true);
-	v_frame.v_on_measure = [&](auto& a_width, auto& a_height)
+	v_host.v_on_measure = [&](auto& a_width, auto& a_height)
 	{
-		auto frame = v_decoration.v_theme.f_frame(v_frame);
-		auto dx = v_decoration.v_theme.v_unit.fWidth + frame.fLeft + frame.fRight;
+		auto frame = v_host.v_measure_frame();
+		auto dx = v_host.v_bar_unit.fWidth + frame.fLeft + frame.fRight;
 		auto dy = frame.fTop + frame.fBottom;
 		a_width = (a_width > 0 ? (a_width - dx) / v_unit.fWidth : v_buffer.f_width()) * v_unit.fWidth + dx;
 		a_height = (a_height > 0 ? (a_height - dy) / v_unit.fHeight : v_buffer.f_height()) * v_unit.fHeight + dy;
 	};
-	v_frame.v_on_map = [&](auto a_width, auto a_height)
+	v_host.v_on_map = [&](auto a_width, auto a_height)
 	{
-		v_frame.f_make_current();
+		v_host.v_surface.f_make_current();
 		if (v_surface) {
 			if (a_width != v_surface->width() || a_height != v_surface->height()) v_surface.reset();
 		} else {
@@ -512,8 +510,8 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, a_width, a_height);
 			v_surface = skia::f_new_surface(v_context.get(), v_framebuffer, a_width, a_height);
 		}
-		auto frame = v_decoration.v_theme.f_frame(v_frame);
-		v_width = a_width - v_decoration.v_theme.v_unit.fWidth - frame.fLeft - frame.fRight;
+		auto frame = v_host.v_measure_frame();
+		v_width = a_width - v_host.v_bar_unit.fWidth - frame.fLeft - frame.fRight;
 		v_height = a_height - frame.fTop - frame.fBottom;
 		auto width = v_buffer.f_width();
 		auto height = v_buffer.f_height();
@@ -536,30 +534,25 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			ws.ws_xpixel = ws.ws_ypixel = 0;
 			ioctl(v_master, TIOCSWINSZ, &ws);
 		}
-		v_decoration.f_invalidate();
 		v_valid.setEmpty();
 		v_preedit_valid = v_bar_valid = false;
 	};
-	v_frame.v_on_unmap = [&]
+	v_host.v_on_unmap = [&]
 	{
-		v_frame.f_make_current();
+		v_host.v_surface.f_make_current();
 		v_surface.reset();
 		v_context.reset();
 		glDeleteFramebuffers(1, &v_framebuffer);
 		glDeleteRenderbuffers(1, &v_renderbuffer);
 	};
-	v_frame.v_on_close = []
-	{
-		suisha::f_loop().f_exit();
-	};
-	v_frame.v_on_frame = [&](auto a_time)
+	v_host.v_surface.v_on_frame = [&](auto a_time)
 	{
 		auto& canvas = *v_surface->getCanvas();
-		auto cw = v_width + v_decoration.v_theme.v_unit.fWidth;
-		auto frame = v_decoration.v_theme.f_frame(v_frame);
+		auto cw = v_width + v_host.v_bar_unit.fWidth;
+		auto frame = v_host.v_measure_frame();
 		auto width = cw + frame.fLeft + frame.fRight;
 		auto height = v_height + frame.fTop + frame.fBottom;
-		v_decoration.f_draw(v_frame, canvas, width, height);
+		v_host.v_draw_frame(canvas, width, height);
 		canvas.save();
 		canvas.translate(frame.fLeft, frame.fTop);
 		canvas.clipIRect(SkIRect::MakeXYWH(0, 0, cw, v_height));
@@ -585,13 +578,13 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v_framebuffer);
-		v_frame.f_swap_buffers();
+		v_host.v_swap_buffers();
 	};
-	v_frame.v_on_focus_enter = v_frame.v_on_focus_leave = [&]
+	v_host.v_surface.v_on_focus_enter = v_host.v_surface.v_on_focus_leave = [&]
 	{
 		f_invalidate(v_buffer.f_cursor_y(), 1);
 	};
-	v_frame.v_on_key_press = v_frame.v_on_key_repeat = [&](auto a_key, auto a_c)
+	v_host.v_surface.v_on_key_press = v_host.v_surface.v_on_key_repeat = [&](auto a_key, auto a_c)
 	{
 		if (v_pressed == c_part__NONE && v_hovered == c_part__CONTENT) f_client().f_cursor__(v_cursor_content = nullptr);
 		f_position__(INT_MAX);
@@ -609,24 +602,24 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			});
 		}
 	};
-	v_frame.v_on_input_enable = [&]
+	v_host.v_surface.v_on_input_enable = [&]
 	{
 		auto [x, y] = v_preedit_cursor;
-		zwp_text_input_v3_set_cursor_rectangle(*v_frame.f_input(), x, y, v_unit.fWidth, v_unit.fHeight);
+		zwp_text_input_v3_set_cursor_rectangle(*v_host.v_surface.f_input(), x, y, v_unit.fWidth, v_unit.fHeight);
 	};
-	v_frame.v_on_input_disable = [&]
+	v_host.v_surface.v_on_input_disable = [&]
 	{
 		v_preedit_valid = false;
 		v_preedit_text.clear();
 	};
-	v_frame.v_on_input_done = [&]
+	v_host.v_surface.v_on_input_done = [&]
 	{
-		auto& text = v_frame.f_input()->f_text();
+		auto& text = v_host.v_surface.f_input()->f_text();
 		v_utf8tomb(text.c_str(), text.size(), [&](auto a_p, auto a_n)
 		{
 			f_send(a_p, a_n);
 		});
-		auto [preedit, begin, end] = v_frame.f_input()->f_preedit();
+		auto [preedit, begin, end] = v_host.v_surface.f_input()->f_preedit();
 		if (begin > end) return;
 		v_preedit_valid = false;
 		v_preedit_text.clear();
@@ -654,7 +647,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	};
 	f_client().v_on_idle.push_back([&]
 	{
-		auto input = v_frame.f_input();
+		auto input = v_host.v_surface.f_input();
 		if (!input || !input->f_done()) return;
 		if (v_preedit_valid) return;
 		v_preedit_valid = true;
@@ -689,35 +682,35 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			put(v_preedit_end, v_preedit_text.size(), {false, false, true, false, false, 0, 1});
 			f_invalidate(v_buffer.f_cursor_y(), v_preedit_rows.size());
 		}
-		auto frame = v_decoration.v_theme.f_frame(v_frame);
+		auto frame = v_host.v_measure_frame();
 		v_preedit_cursor = {
 			frame.fLeft + std::get<0>(cursor) * v_unit.fWidth,
 			frame.fTop + (v_buffer.f_log_size() + std::get<1>(cursor)) * v_unit.fHeight - v_position
 		};
-		if (&v_frame != f_client().f_input_focus()) return;
-		v_frame.v_on_input_enable();
+		if (&v_host.v_surface != f_client().f_input_focus()) return;
+		v_host.v_surface.v_on_input_enable();
 		input->f_commit();
 	});
 	--v_idle;
-	v_frame.f_input__(f_client().f_new_input());
+	v_host.v_surface.f_input__(f_client().f_new_input());
 	auto hovered = [&](auto a_part)
 	{
 		if (a_part == v_hovered) return;
 		v_hovered = a_part;
 		v_bar_valid = false;
-		v_frame.f_request_frame();
+		v_host.v_surface.f_request_frame();
 	};
 	auto hover = [&, hovered]
 	{
-		auto frame = v_decoration.v_theme.f_frame(v_frame);
+		auto frame = v_host.v_measure_frame();
 		auto y = f_client().f_pointer_y() - frame.fTop;
 		if (y < 0.0) return hovered(c_part__NONE);
 		auto x = f_client().f_pointer_x() - frame.fLeft;
 		if (x < v_width) return hovered(x >= 0.0 && y < v_height ? c_part__CONTENT : c_part__NONE);
-		if (x >= v_width + v_decoration.v_theme.v_unit.fWidth) return hovered(c_part__NONE);
+		if (x >= v_width + v_host.v_bar_unit.fWidth) return hovered(c_part__NONE);
 		auto content = f_content();
 		if (content <= v_height) return hovered(c_part__OTHER);
-		auto bh = v_decoration.v_theme.v_unit.fHeight;
+		auto bh = v_host.v_bar_unit.fHeight;
 		if (v_height < bh * 2) return hovered(y < v_height / 2 ? c_part__BUTTON_UP : c_part__BUTTON_DOWN);
 		if (y < bh) return hovered(c_part__BUTTON_UP);
 		int gap_end = v_height - bh;
@@ -737,38 +730,38 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	auto hover_cursor = [&, hover]
 	{
 		hover();
-		f_client().f_cursor__(v_hovered == c_part__CONTENT ? v_cursor_content : &v_decoration.v_theme.v_cursor_arrow);
+		f_client().f_cursor__(v_hovered == c_part__CONTENT ? v_cursor_content : &v_host.v_cursor_arrow);
 	};
 	v_on_hover = [&, hover_cursor]
 	{
 		if (v_hovered != c_part__NONE) hover_cursor();
 	};
-	v_frame.v_on_pointer_enter = v_frame.v_on_pointer_move = [&, hover_cursor]
+	v_host.v_surface.v_on_pointer_enter = v_host.v_surface.v_on_pointer_move = [&, hover_cursor]
 	{
-		v_cursor_content = &v_decoration.v_theme.v_cursor_text;
+		v_cursor_content = &v_host.v_cursor_text;
 		hover_cursor();
 	};
-	v_frame.v_on_pointer_leave = [&, hovered]
+	v_host.v_surface.v_on_pointer_leave = [&, hovered]
 	{
 		hovered(c_part__NONE);
 	};
-	v_frame.v_on_button_press = [&, hover](auto a_button)
+	v_host.v_surface.v_on_button_press = [&, hover](auto a_button)
 	{
 		if (v_hovered == c_part__NONE) return;
 		v_pressed = v_hovered;
 		v_bar_valid = false;
-		v_frame.f_request_frame();
-		auto release = [&, hover = v_on_hover, move = v_frame.v_on_pointer_move](auto a_button)
+		v_host.v_surface.f_request_frame();
+		auto release = [&, hover = v_on_hover, move = v_host.v_surface.v_on_pointer_move](auto a_button)
 		{
 			v_pressed = c_part__NONE;
 			v_bar_valid = false;
-			v_frame.f_request_frame();
+			v_host.v_surface.f_request_frame();
 			v_on_hover = hover;
-			v_frame.v_on_pointer_move = move;
+			v_host.v_surface.v_on_pointer_move = move;
 			move();
-			v_frame.v_on_button_release = {};
+			v_host.v_surface.v_on_button_release = {};
 		};
-		v_on_hover = v_frame.v_on_pointer_move = hover;
+		v_on_hover = v_host.v_surface.v_on_pointer_move = hover;
 		int delta;
 		switch (v_hovered) {
 		case c_part__BUTTON_UP:
@@ -788,22 +781,22 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 				auto w2v = [&]
 				{
 					auto content = f_content();
-					auto bh = v_decoration.v_theme.v_unit.fHeight;
+					auto bh = v_host.v_bar_unit.fHeight;
 					auto gap = v_height - bh * 2;
 					unsigned thumb = static_cast<double>(gap) * v_height / content;
 					if (thumb < bh) thumb = bh;
 					return static_cast<double>(gap - thumb) / (content - v_height);
 				};
-				v_frame.v_on_pointer_move = [&, w2v, thumb0__y0 = v_position * w2v() - f_client().f_pointer_y()]
+				v_host.v_surface.v_on_pointer_move = [&, w2v, thumb0__y0 = v_position * w2v() - f_client().f_pointer_y()]
 				{
 					f_position__((thumb0__y0 + f_client().f_pointer_y()) / w2v());
 				};
 			}
 		default:
-			v_frame.v_on_button_release = release;
+			v_host.v_surface.v_on_button_release = release;
 			return;
 		}
-		v_frame.v_on_button_release = [&, release](auto a_button)
+		v_host.v_surface.v_on_button_release = [&, release](auto a_button)
 		{
 			v_repeat->f_stop();
 			v_repeat = {};
@@ -819,8 +812,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			v_repeat = suisha::f_loop().f_timer(repeat, 40ms);
 		}, 400ms, true);
 	};
-	v_decoration.f_hook(v_frame);
-	v_frame.v_on_scroll = [&](auto a_axis, auto a_value)
+	v_host.v_surface.v_on_scroll = [&](auto a_axis, auto a_value)
 	{
 		if (a_axis == WL_POINTER_AXIS_VERTICAL_SCROLL) f_position__(v_position + std::copysign(v_unit.fHeight * 4, a_value));
 	};
@@ -859,7 +851,6 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		f_invalidate(v_buffer.f_cursor_y(), 1);
 		v_preedit_valid = false;
 	});
-	xdg_toplevel_set_title(v_frame, a_name);
 }
 
 t_window::~t_window()
