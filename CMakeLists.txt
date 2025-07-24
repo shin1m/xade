@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(xade VERSION 202504)
+project(xade VERSION 202507)
 find_package(OpenGL REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(WAYLAND REQUIRED

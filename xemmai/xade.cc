@@ -341,7 +341,7 @@ std::vector<std::pair<t_root, t_rvalue>> t_library::f_define()
 	{
 		t_session session;
 		session.v_object = f_new<t_client>(a_library);
-		a_callable(session.v_object);
+		a_callable();
 	}>())
 	(L"client"sv, t_static<t_object*(*)(), []
 	{
