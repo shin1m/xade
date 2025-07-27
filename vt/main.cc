@@ -141,7 +141,7 @@ int f_main(int argc, char* argv[], int a_master)
 				theme.v_cursor_text,
 				theme.v_cursor_arrow
 			};
-			t_window window(log, columns, rows, a_master, {typeface, 16}, host);
+			t_window window(log, columns, rows, a_master, {typeface, 14}, host);
 			prepare();
 			loop.f_run();
 		};
