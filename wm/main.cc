@@ -958,7 +958,7 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 					return;
 				}
 			}
-			if (sym == XKB_KEY_Kanji || sym == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
+			if (sym == XKB_KEY_Zenkaku_Hankaku || sym == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
 				p->v_on ^= true;
 				if (p->v_on) {
 					wlr_input_method_v2_send_activate(*p);
