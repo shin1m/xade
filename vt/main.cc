@@ -139,7 +139,8 @@ int f_main(int argc, char* argv[], int a_master)
 				},
 				measure_frame,
 				draw_frame,
-				theme.v_color_background,
+				theme.v_color_background_active,
+				theme.v_color_background_inactive,
 				theme.v_unit,
 				[&](auto& a_canvas, auto a_index, auto a_x, auto a_y, auto a_state)
 				{

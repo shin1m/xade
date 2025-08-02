@@ -288,7 +288,7 @@ void t_window::f_draw_bar(SkCanvas& a_canvas)
 		a_canvas.drawIRect(SkIRect::MakeXYWH(x, 0, bw, v_height), paint);
 		return;
 	}
-	paint.setColor(v_host.v_bar_color);
+	paint.setColor(&v_host.v_surface == f_client().f_keyboard_focus() ? v_host.v_bar_color_active : v_host.v_bar_color_inactive);
 	auto bh = v_host.v_bar_unit.fHeight;
 	if (v_height > bh * 3) {
 		unsigned gap = v_height - bh * 2;

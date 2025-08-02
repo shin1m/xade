@@ -15,7 +15,8 @@ class t_theme
 public:
 	const SkFont v_font;
 	const SkColor v_color_foreground;
-	const SkColor v_color_background;
+	const SkColor v_color_background_active;
+	const SkColor v_color_background_inactive;
 	const SkColor v_color_hovered;
 	const SkColor v_color_pressed;
 	const SkISize v_unit;

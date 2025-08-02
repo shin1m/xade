@@ -107,7 +107,8 @@ public:
 		std::function<void()> v_swap_buffers;
 		std::function<SkIRect()> v_measure_frame;
 		std::function<void(SkCanvas&, size_t, size_t)> v_draw_frame;
-		const SkColor v_bar_color;
+		const SkColor v_bar_color_active;
+		const SkColor v_bar_color_inactive;
 		const SkISize v_bar_unit;
 		std::function<void(SkCanvas&, size_t, int, int, size_t)> v_draw_button;
 		const t_cursor& v_cursor_text;

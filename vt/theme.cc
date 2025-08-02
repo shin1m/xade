@@ -2,7 +2,8 @@
 
 t_theme::t_theme(const SkFont& a_font, size_t a_border) : v_font(a_font), v_border(a_border),
 v_color_foreground(SkColorSetARGB(255, 255, 255, 255)),
-v_color_background(SkColorSetARGB(63, 0, 63, 127)),
+v_color_background_active(SkColorSetARGB(63, 0, 63, 127)),
+v_color_background_inactive(SkColorSetARGB(0, 0, 0, 0)),
 v_color_hovered(SkColorSetARGB(127, 63, 127, 255)),
 v_color_pressed(SkColorSetARGB(255, 191, 127, 63)),
 v_unit(v_font.getSize(), v_font.getSize()),
@@ -77,7 +78,7 @@ void t_decoration::f_draw(t_frame& a_frame, SkCanvas& a_canvas, size_t a_width, 
 	if (a_frame.f_is(XDG_TOPLEVEL_STATE_FULLSCREEN)) return;
 	SkPaint paint;
 	paint.setBlendMode(SkBlendMode::kSrc);
-	paint.setColor(v_theme.v_color_background);
+	paint.setColor(a_frame.f_is(XDG_TOPLEVEL_STATE_ACTIVATED) ? v_theme.v_color_background_active : v_theme.v_color_background_inactive);
 	auto [b, c] = v_theme.f_border(a_frame);
 	a_canvas.drawIRect(SkIRect::MakeXYWH(0, 0, a_width, c), paint);
 	auto height = a_height - c - b;
