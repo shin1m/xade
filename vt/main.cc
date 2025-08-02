@@ -101,7 +101,14 @@ int f_main(int argc, char* argv[], int a_master)
 		using namespace std::literals;
 		auto fm = SkFontMgr_New_FontConfig(nullptr);
 		auto typeface = fm->matchFamilyStyle(nullptr, {});
-		auto symbols = fm->makeFromFile((argv[0] + ".symbols"s).c_str());
+		auto self = []
+		{
+			char cs[PATH_MAX];
+			auto n = readlink("/proc/self/exe", cs, sizeof(cs));
+			if (n == -1) throw std::system_error(errno, std::generic_category());
+			return std::string(cs, n);
+		};
+		auto symbols = fm->makeFromFile((self() + ".symbols").c_str());
 		if (!symbols) symbols = typeface;
 		suisha::t_loop loop;
 		zwlr_layer_shell_v1* shell = NULL;
