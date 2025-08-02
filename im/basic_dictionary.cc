@@ -301,11 +301,11 @@ void f_put(std::map<std::wstring, std::vector<std::wstring>>& a_map, const std::
 	texts.insert(texts.begin(), a_text);
 }
 
-void f_search(const char* a_path, const char* a_entry, size_t a_n, bool a_ari, std::deque<t_candidate>& a_candidates, std::map<std::wstring, t_candidate*>& a_map)
+void f_search(const char* a_path, const char* a_encoding, const char* a_entry, size_t a_n, bool a_ari, std::deque<t_candidate>& a_candidates, std::map<std::wstring, t_candidate*>& a_map)
 {
 	t_file file(a_path, "rb");
 	if (!file.f_seek(a_entry, a_n, a_ari)) return;
-	t_decoder<t_file> decoder(file, "euc-jp");
+	t_decoder<t_file> decoder(file, a_encoding);
 	t_lexer<t_decoder<t_file>> lexer(decoder);
 	while (lexer.f_token() == c_token__TEXT) {
 		f_add(a_candidates, a_map, lexer.f_text(), lexer.f_annotation());
@@ -322,7 +322,7 @@ void t_basic_dictionary::f_load()
 	v_aris.clear();
 	t_file file(v_private.c_str(), "rb");
 	if (!file.f_seek()) return;
-	t_decoder<t_file> decoder(file, "euc-jp");
+	t_decoder<t_file> decoder(file, v_encoding);
 	while (true) {
 		wint_t c = decoder();
 		if (c == WEOF) break;
@@ -371,7 +371,7 @@ void t_basic_dictionary::f_save() const
 {
 	if (v_private.empty()) return;
 	t_file file(v_private.c_str(), "wb");
-	t_encoder<t_file> encoder(file, "euc-jp");
+	t_encoder<t_file> encoder(file, v_encoding);
 	encoder(L";; okuri-ari entries.\n");
 	for (auto i = v_aris.rbegin(); i != v_aris.rend(); ++i) {
 		encoder(i->first.begin(), i->first.end());
@@ -418,7 +418,7 @@ void t_basic_dictionary::f_search(const wchar_t* a_entry, size_t a_n, size_t a_o
 	}
 	std::vector<char> cs;
 	v_wctoeuc(a_entry, a_n, f_appender(cs));
-	for (const auto& x : v_publics) ::f_search(x.c_str(), &cs[0], cs.size(), ari, a_candidates, map);
+	for (const auto& x : v_publics) ::f_search(x.c_str(), v_encoding, &cs[0], cs.size(), ari, a_candidates, map);
 }
 
 void t_basic_dictionary::f_register(const wchar_t* a_entry, size_t a_n, size_t a_okuri, const wchar_t* a_text, size_t a_m)

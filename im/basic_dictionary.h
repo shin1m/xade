@@ -12,7 +12,9 @@ class t_basic_dictionary : public t_dictionary
 	using t_map0 = std::map<std::wstring, std::vector<std::wstring>>;
 	using t_map1 = std::map<std::wstring, t_map0>;
 
-	t_converter<wchar_t, char> v_wctoeuc{"wchar_t", "euc-jp"};
+	static constexpr const char* v_encoding = "euc-jisx0213";
+
+	t_converter<wchar_t, char> v_wctoeuc{"wchar_t", v_encoding};
 	std::vector<std::string> v_publics;
 	std::string v_private;
 	t_map0 v_nashis;
