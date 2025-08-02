@@ -168,6 +168,8 @@ std::fprintf(stderr, "write: %s\n", std::strerror(errno));
 
 int t_window::f_draw_row(SkCanvas& a_canvas, int a_x, int a_y, const t_row* a_row)
 {
+	a_canvas.save();
+	a_canvas.clipIRect(SkIRect::MakeXYWH(0, a_y, v_width, v_unit.fHeight));
 	const auto* cells = a_row->v_cells;
 	SkPaint paint;
 	paint.setBlendMode(SkBlendMode::kSrc);
@@ -199,6 +201,7 @@ int t_window::f_draw_row(SkCanvas& a_canvas, int a_x, int a_y, const t_row* a_ro
 		if (a.v_underlined) a_canvas.drawIRect(SkIRect::MakeXYWH(a_x, u, w, 1), paint);
 		a_x += w;
 	}
+	a_canvas.restore();
 	return a_x;
 }
 
