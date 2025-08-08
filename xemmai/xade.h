@@ -95,22 +95,24 @@ struct t_layered;
 
 class t_library : public xemmai::t_library
 {
-	t_slot_of<t_type> v_type_client;
-	t_slot_of<t_type> v_type_button;
-	t_slot_of<t_type> v_type_pointer_axis;
-	t_slot_of<t_type> v_type_key;
-	t_slot_of<t_type> v_type_proxy;
-	t_slot_of<t_type> v_type_surface;
-	t_slot_of<t_type> v_type_frame_state;
-	t_slot_of<t_type> v_type_frame_wm_capabilities;
-	t_slot_of<t_type> v_type_frame_resize_edge;
-	t_slot_of<t_type> v_type_frame;
-	t_slot_of<t_type> v_type_cursor;
-	t_slot_of<t_type> v_type_input;
-	t_slot_of<t_type> v_type_layer;
-	t_slot_of<t_type> v_type_anchor;
-	t_slot_of<t_type> v_type_keyboard_interactivity;
-	t_slot_of<t_type> v_type_layered;
+#define XEMMAIX__XADE__TYPES(_)\
+	_(client)\
+	_##_JUST(button)\
+	_##_AS(wl_pointer_axis, pointer_axis)\
+	_##_JUST(key)\
+	_(proxy)\
+	_(surface)\
+	_##_AS(xdg_toplevel_state, frame_state)\
+	_##_AS(xdg_toplevel_wm_capabilities, frame_wm_capabilities)\
+	_##_AS(xdg_toplevel_resize_edge, frame_resize_edge)\
+	_(frame)\
+	_(cursor)\
+	_(input)\
+	_##_AS(zwlr_layer_shell_v1_layer, layer)\
+	_##_AS(zwlr_layer_surface_v1_anchor, anchor)\
+	_##_AS(zwlr_layer_surface_v1_keyboard_interactivity, keyboard_interactivity)\
+	_(layered)
+	XEMMAIX__XADE__TYPES(XEMMAI__TYPE__DECLARE)
 
 public:
 	using xemmai::t_library::t_library;
@@ -118,20 +120,9 @@ public:
 };
 
 XEMMAI__LIBRARY__BASE(t_library, t_global, f_global())
-XEMMAI__LIBRARY__TYPE(t_library, client)
-XEMMAI__LIBRARY__TYPE_AS(t_library, wl_pointer_axis, pointer_axis)
-XEMMAI__LIBRARY__TYPE(t_library, proxy)
-XEMMAI__LIBRARY__TYPE(t_library, surface)
-XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_state, frame_state)
-XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_wm_capabilities, frame_wm_capabilities)
-XEMMAI__LIBRARY__TYPE_AS(t_library, xdg_toplevel_resize_edge, frame_resize_edge)
-XEMMAI__LIBRARY__TYPE(t_library, frame)
-XEMMAI__LIBRARY__TYPE(t_library, cursor)
-XEMMAI__LIBRARY__TYPE(t_library, input)
-XEMMAI__LIBRARY__TYPE_AS(t_library, zwlr_layer_shell_v1_layer, layer)
-XEMMAI__LIBRARY__TYPE_AS(t_library, zwlr_layer_surface_v1_anchor, anchor)
-XEMMAI__LIBRARY__TYPE_AS(t_library, zwlr_layer_surface_v1_keyboard_interactivity, keyboard_interactivity)
-XEMMAI__LIBRARY__TYPE(t_library, layered)
+#define XEMMAI__TYPE__LIBRARY t_library
+XEMMAIX__XADE__TYPES(XEMMAI__TYPE__DEFINE)
+#undef XEMMAI__TYPE__LIBRARY
 
 }
 

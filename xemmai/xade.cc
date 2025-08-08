@@ -42,22 +42,7 @@ void t_proxy::f_dispose()
 
 void t_library::f_scan(t_scan a_scan)
 {
-	a_scan(v_type_client);
-	a_scan(v_type_button);
-	a_scan(v_type_pointer_axis);
-	a_scan(v_type_key);
-	a_scan(v_type_proxy);
-	a_scan(v_type_surface);
-	a_scan(v_type_frame_state);
-	a_scan(v_type_frame_wm_capabilities);
-	a_scan(v_type_frame_resize_edge);
-	a_scan(v_type_frame);
-	a_scan(v_type_cursor);
-	a_scan(v_type_input);
-	a_scan(v_type_layer);
-	a_scan(v_type_anchor);
-	a_scan(v_type_keyboard_interactivity);
-	a_scan(v_type_layered);
+	XEMMAIX__XADE__TYPES(XEMMAI__TYPE__SCAN)
 }
 
 std::vector<std::pair<t_root, t_rvalue>> t_library::f_define()

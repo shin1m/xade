@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.30)
-project(xade VERSION 202507)
+project(xade VERSION 202508)
 find_package(OpenGL REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(WAYLAND REQUIRED
@@ -21,7 +21,7 @@ set(SKIA ${PROJECT_SOURCE_DIR}/skia)
 add_library(skia SHARED IMPORTED)
 target_include_directories(skia INTERFACE ${SKIA})
 set_property(TARGET skia PROPERTY IMPORTED_LOCATION ${SKIA}/out/Shared/libskia.so)
-find_package(xemmai 202504 REQUIRED)
+find_package(xemmai 202508 REQUIRED)
 function(add_wayland_client path name visibility)
 	set(in ${path}/${name}.xml)
 	add_custom_command(OUTPUT ${name}.h
