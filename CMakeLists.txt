@@ -16,7 +16,7 @@ pkg_check_modules(WLROOTS REQUIRED
 pkg_get_variable(WAYLAND_PROTOCOLS wayland-protocols pkgdatadir)
 pkg_get_variable(WAYLAND_SCANNER wayland-scanner wayland_scanner)
 pkg_get_variable(WLR_PROTOCOLS wlr-protocols pkgdatadir)
-find_package(suisha 202408 REQUIRED)
+find_package(suisha 202508 REQUIRED)
 set(SKIA ${PROJECT_SOURCE_DIR}/skia)
 add_library(skia SHARED IMPORTED)
 target_include_directories(skia INTERFACE ${SKIA})

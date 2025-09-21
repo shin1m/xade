@@ -187,7 +187,7 @@ t_client::t_client(std::function<void(wl_registry*, uint32_t, const char*, uint3
 	if (v_egl_display == EGL_NO_DISPLAY) throw std::runtime_error("eglGetDisplay");
 	if (eglInitialize(v_egl_display, NULL, NULL) != EGL_TRUE) throw std::runtime_error("eglInitialize");
 	auto& loop = suisha::f_loop();
-	loop.f_poll(wl_display_get_fd(v_display), true, false, [](auto, auto)
+	loop.f_poll(wl_display_get_fd(v_display), POLLIN, [](auto)
 	{
 	});
 	loop.v_wait = [this, wait = std::move(loop.v_wait)]
@@ -198,7 +198,7 @@ t_client::t_client(std::function<void(wl_registry*, uint32_t, const char*, uint3
 			do if (wl_display_dispatch_pending(v_display) == -1) throw std::runtime_error("wl_display_dispatch_pending"); while (wl_display_prepare_read(v_display) != 0);
 			suisha::f_loop().f_more();
 		}
-		suisha::f_loop().f_poll(wl_display_get_fd(v_display), true, wl_display_flush(v_display) == -1 && errno == EAGAIN);
+		suisha::f_loop().f_poll(wl_display_get_fd(v_display), POLLIN | (wl_display_flush(v_display) == -1 && errno == EAGAIN ? POLLOUT : 0));
 		try {
 			wait();
 			if (wl_display_read_events(v_display) == -1) throw std::system_error(errno, std::generic_category());

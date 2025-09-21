@@ -819,9 +819,9 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	{
 		if (a_axis == WL_POINTER_AXIS_VERTICAL_SCROLL) f_position__(v_position + std::copysign(v_unit.fHeight * 4, a_value));
 	};
-	suisha::f_loop().f_poll(a_master, true, false, [&](auto a_readable, auto)
+	suisha::f_loop().f_poll(a_master, POLLIN, [&](auto a_events)
 	{
-		if (!a_readable) return;
+		if (!(a_events & POLLIN)) return;
 		ssize_t n = read(v_master, v_mbs + v_mbn, sizeof(v_mbs) - v_mbn);
 		if (n == ssize_t(-1)) {
 			std::fprintf(stderr, "read: %s\n", std::strerror(errno));
