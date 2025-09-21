@@ -405,7 +405,7 @@ v_colors{
 	SkColorSetARGB(255, 255, 255, 255),
 
 	SkColorSetARGB(255, 127, 127, 127),
-	SkColorSetARGB(255, 0, 0, 0),
+	SkColorSetARGB(127, 0, 0, 0),
 	SkColorSetARGB(255, 63, 63, 63),
 	SkColorSetARGB(255, 127, 31, 31),
 	SkColorSetARGB(255, 31, 127, 31),
@@ -416,7 +416,7 @@ v_colors{
 	SkColorSetARGB(255, 127, 127, 127),
 
 	SkColorSetARGB(255, 255, 255, 255),
-	SkColorSetARGB(255, 0, 0, 0),
+	SkColorSetARGB(127, 0, 0, 0),
 	SkColorSetARGB(255, 0, 0, 0),
 	SkColorSetARGB(255, 255, 63, 63),
 	SkColorSetARGB(255, 63, 255, 63),
@@ -427,7 +427,7 @@ v_colors{
 	SkColorSetARGB(255, 255, 255, 255),
 
 	SkColorSetARGB(255, 127, 127, 127),
-	SkColorSetARGB(255, 0, 0, 0),
+	SkColorSetARGB(127, 0, 0, 0),
 	SkColorSetARGB(255, 63, 63, 63),
 	SkColorSetARGB(255, 127, 31, 31),
 	SkColorSetARGB(255, 31, 127, 31),
