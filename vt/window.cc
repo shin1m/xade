@@ -623,7 +623,6 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			f_send(a_p, a_n);
 		});
 		auto [preedit, begin, end] = v_host.v_surface.f_input()->f_preedit();
-		if (begin > end) return;
 		v_preedit_valid = false;
 		v_preedit_text.clear();
 		if (preedit.empty()) return;
@@ -686,10 +685,12 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			f_invalidate(v_buffer.f_cursor_y(), v_preedit_rows.size());
 		}
 		auto frame = v_host.v_measure_frame();
-		v_preedit_cursor = {
+		auto preedit_cursor = std::make_tuple(
 			frame.fLeft + std::get<0>(cursor) * v_unit.fWidth,
 			frame.fTop + (v_buffer.f_log_size() + std::get<1>(cursor)) * v_unit.fHeight - v_position
-		};
+		);
+		if (preedit_cursor == v_preedit_cursor) return;
+		v_preedit_cursor = preedit_cursor;
 		if (&v_host.v_surface != f_client().f_input_focus()) return;
 		v_host.v_surface.v_on_input_enable();
 		input->f_commit();

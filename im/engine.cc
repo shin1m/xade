@@ -73,7 +73,7 @@ void t_engine::f_roman_reduce(const wchar_t* a_cs, size_t a_n)
 		f_on_compose(i, n, a_cs, as.data(), a_n);
 	} else {
 		state = t_state();
-		f_on_commit(&v_buffer[0], v_buffer.size());
+		f_on_commit(v_buffer.data(), v_buffer.size());
 		v_buffer.clear();
 	}
 }
@@ -146,7 +146,7 @@ void t_engine::f_text_commit()
 			f_on_compose(0, text, &v_buffer[state.v_base], as.data(), as.size());
 		} else {
 			state = t_state();
-			f_on_commit(&v_buffer[0], v_buffer.size());
+			f_on_commit(v_buffer.data(), v_buffer.size());
 			v_buffer.clear();
 		}
 		f_on_status();
@@ -193,7 +193,7 @@ void t_engine::f_entry_commit()
 		f_on_compose(i, n, &v_buffer[state.v_base + i], as.data(), n);
 	} else {
 		state = t_state();
-		f_on_commit(&v_buffer[0], v_buffer.size());
+		f_on_commit(v_buffer.data(), v_buffer.size());
 		v_buffer.clear();
 	}
 	f_on_status();
@@ -418,7 +418,7 @@ void t_engine::f_mode_choose(xkb_keysym_t a_key, char a_ascii)
 			f_on_compose(i, n, &v_buffer[state.v_base + i], as.data(), as.size());
 		} else {
 			state = t_state();
-			f_on_commit(&v_buffer[0], v_buffer.size());
+			f_on_commit(v_buffer.data(), v_buffer.size());
 			v_buffer.clear();
 		}
 		f_on_status();

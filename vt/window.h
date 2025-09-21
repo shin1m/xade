@@ -51,7 +51,7 @@ class t_window
 	size_t v_preedit_begin;
 	size_t v_preedit_end;
 	std::vector<std::unique_ptr<t_row>> v_preedit_rows;
-	std::tuple<int, size_t> v_preedit_cursor;
+	std::tuple<int, int> v_preedit_cursor;
 	bool v_preedit_valid = false;
 	int v_position = 0;
 	GLuint v_renderbuffer = 0;

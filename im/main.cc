@@ -36,7 +36,6 @@ class t_context : public t_engine
 	t_xkb v_xkb;
 
 	void f_send_preedit();
-	void f_process(xkb_keysym_t a_key, char a_ascii);
 
 protected:
 	virtual void f_on_forward()
@@ -198,18 +197,36 @@ zwp_input_method_keyboard_grab_v2_listener t_context::v_zwp_input_method_keyboar
 	{
 		auto& self = *static_cast<t_context*>(a_data);
 		self.v_xkb.f_stop();
-		auto press = [&self](auto sym, auto c)
+		auto forward = [&]
 		{
-			self.f_process(sym, c);
+			char cs[25];
+			std::sprintf(cs, "%08x%08x%08x", a_time, a_key, a_state);
+			zwp_input_method_v2_commit_string(self.v_input, cs);
+			zwp_input_method_v2_delete_surrounding_text(self.v_input, 0x80000000, 0);
+			self.f_send_preedit();
 		};
-		self.v_xkb.f_key(a_key, a_state, press, press, [](auto, auto)
+		self.v_xkb.f_key(a_key, a_state, [&](auto sym, auto c)
 		{
+			self.v_forwarded = false;
+			self.f_key_pressed(sym, c);
+			if (self.v_forwarded) forward();
+		}, [&](auto sym, auto c)
+		{
+			self.f_key_pressed(sym, c);
+		}, [&](auto, auto)
+		{
+			forward();
 		});
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_depressed, auto a_latched, auto a_locked, auto a_group)
 	{
 		auto& self = *static_cast<t_context*>(a_data);
 		if (self.v_xkb) xkb_state_update_mask(self.v_xkb, a_depressed, a_latched, a_locked, a_group, a_group, a_group);
+		char cs[33];
+		std::sprintf(cs, "%08x%08x%08x%08x", a_depressed, a_latched, a_locked, a_group);
+		zwp_input_method_v2_commit_string(self.v_input, cs);
+		zwp_input_method_v2_delete_surrounding_text(self.v_input, 0x80000001, 0);
+		self.f_send_preedit();
 	},
 	[](auto a_data, auto a_this, auto a_rate, auto a_delay)
 	{
@@ -241,16 +258,6 @@ void t_context::f_send_preedit()
 	}
 	cs.push_back('\0');
 	zwp_input_method_v2_set_preedit_string(v_input, cs.data(), begin, end);
-	zwp_input_method_v2_commit(v_input, v_serial);
-}
-
-void t_context::f_process(xkb_keysym_t a_key, char a_ascii)
-{
-	v_forwarded = false;
-	f_key_pressed(a_key, a_ascii);
-	if (!v_forwarded) return;
-	char cs[] = {a_ascii, '\0'};
-	zwp_input_method_v2_commit_string(v_input, cs);
 	zwp_input_method_v2_commit(v_input, v_serial);
 }
 

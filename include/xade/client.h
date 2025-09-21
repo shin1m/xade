@@ -337,15 +337,15 @@ class t_input
 	t_owner<zwp_text_input_v3*, zwp_text_input_v3_destroy> v_input;
 	uint32_t v_serial = 0;
 	uint32_t v_done = 0;
-	std::tuple<std::string, int32_t, int32_t> v_preedit{{}, 0, -1};
+	std::tuple<std::string, int32_t, int32_t> v_preedit;
 	std::string v_commit;
 	std::tuple<uint32_t, uint32_t> v_delete;
 
 	void f_reset()
 	{
-		v_delete = {};
+		v_preedit = {};
 		v_commit = {};
-		v_preedit = {{}, 0, -1};
+		v_delete = {};
 	}
 	void f_enable();
 	void f_disable();

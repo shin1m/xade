@@ -418,7 +418,7 @@ void t_basic_dictionary::f_search(const wchar_t* a_entry, size_t a_n, size_t a_o
 	}
 	std::vector<char> cs;
 	v_wctoeuc(a_entry, a_n, f_appender(cs));
-	for (const auto& x : v_publics) ::f_search(x.c_str(), v_encoding, &cs[0], cs.size(), ari, a_candidates, map);
+	for (const auto& x : v_publics) ::f_search(x.c_str(), v_encoding, cs.data(), cs.size(), ari, a_candidates, map);
 }
 
 void t_basic_dictionary::f_register(const wchar_t* a_entry, size_t a_n, size_t a_okuri, const wchar_t* a_text, size_t a_m)

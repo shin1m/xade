@@ -1,11 +1,8 @@
+#include <charconv>
 #include <functional>
 #include <stdexcept>
-#include <string>
-#include <cassert>
-#include <cstdlib>
-#include <cstdio>
+#include <cstring>
 #include <unistd.h>
-#include <wayland-server-core.h>
 extern "C"
 {
 #include <wlr/backend.h>
@@ -499,10 +496,13 @@ struct t_text_input
 		{
 			t_text_input* self = wl_container_of(a_listener, self, v_commit);
 			if (self->v_text_input->focused_surface && self->v_text_input->current_enabled) {
-				if (!self->v_server->v_focused_text_input)
+				if (!self->v_server->v_focused_text_input) {
 					self->f_focus();
-				else if (auto p = self->v_server->v_input_method; p && p->v_on)
+				} else if (auto p = self->v_server->v_input_method; p && p->v_on) {
 					self->f_send();
+					auto& preedit = p->v_input_method->current.preedit;
+					wlr_text_input_v3_send_preedit_string(*self, preedit.text, preedit.cursor_begin, preedit.cursor_end);
+				}
 			}
 			wlr_text_input_v3_send_done(*self);
 		};
@@ -965,7 +965,6 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 					q->f_send();
 				} else {
 					p->f_deactivate();
-					wlr_text_input_v3_send_preedit_string(*q, NULL, 0, 0);
 					wlr_text_input_v3_send_done(*q);
 				}
 				return;
@@ -996,12 +995,32 @@ t_input_method::t_input_method(t_server* a_server, wlr_input_method_v2* a_input_
 	v_commit.notify = [](auto a_listener, auto a_data)
 	{
 		t_input_method* self = wl_container_of(a_listener, self, v_commit);
-		if (auto p = self->v_server->v_focused_text_input) {
-			auto& state = self->v_input_method->current;
+		auto& state = self->v_input_method->current;
+		auto& ds = state.delete_surrounding;
+		if (ds.before_length & 0x80000000) {
+			if (auto p = self->v_input_method->keyboard_grab; p && state.commit_text) {
+				auto seat = self->v_server->v_seat;
+				wlr_seat_set_keyboard(seat, p->keyboard);
+				auto get = [&](size_t i, auto& x)
+				{
+					auto p = state.commit_text + i * 8;
+					return std::from_chars(p, p + 8, x, 16).ec == std::errc{};
+				};
+				auto n = std::strlen(state.commit_text);
+				if (ds.before_length == 0x80000000) {
+					uint32_t time;
+					uint32_t key;
+					uint32_t state;
+					if (n == 3 * 8 && get(0, time) && get(1, key) && get(2, state)) wlr_seat_keyboard_notify_key(seat, time, key, state);
+				} else {
+					wlr_keyboard_modifiers modifiers;
+					if (n == 4 * 8 && get(0, modifiers.depressed) && get(1, modifiers.latched) && get(2, modifiers.locked) && get(3, modifiers.group)) wlr_seat_keyboard_notify_modifiers(seat, &modifiers);
+				}
+			}
+		} else if (auto p = self->v_server->v_focused_text_input) {
 			auto& preedit = state.preedit;
 			wlr_text_input_v3_send_preedit_string(*p, preedit.text, preedit.cursor_begin, preedit.cursor_end);
 			wlr_text_input_v3_send_commit_string(*p, state.commit_text);
-			auto& ds = state.delete_surrounding;
 			wlr_text_input_v3_send_delete_surrounding_text(*p, ds.before_length, ds.after_length);
 			wlr_text_input_v3_send_done(*p);
 		}
