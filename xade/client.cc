@@ -1,5 +1,4 @@
 #include <xade/client.h>
-#include <cstring>
 #include <sys/mman.h>
 
 namespace xade
@@ -28,6 +27,8 @@ wl_registry_listener t_client::v_registry_listener = {
 			self.v_shm = static_cast<wl_shm*>(wl_registry_bind(a_this, a_name, &wl_shm_interface, std::min<uint32_t>(a_version, wl_shm_interface.version)));
 		else if (std::strcmp(a_interface, wl_seat_interface.name) == 0)
 			self.v_seat = static_cast<wl_seat*>(wl_registry_bind(a_this, a_name, &wl_seat_interface, std::min<uint32_t>(a_version, wl_seat_interface.version)));
+		else if (std::strcmp(a_interface, wl_data_device_manager_interface.name) == 0)
+			self.v_data_device_manager = static_cast<wl_data_device_manager*>(wl_registry_bind(a_this, a_name, &wl_data_device_manager_interface, std::min<uint32_t>(a_version, wl_data_device_manager_interface.version)));
 		else if (std::strcmp(a_interface, xdg_wm_base_interface.name) == 0)
 			self.v_xdg_wm_base = static_cast<xdg_wm_base*>(wl_registry_bind(a_this, a_name, &xdg_wm_base_interface, std::min<uint32_t>(a_version, xdg_wm_base_interface.version)));
 		else if (std::strcmp(a_interface, zwp_text_input_manager_v3_interface.name) == 0)
@@ -160,6 +161,56 @@ wl_keyboard_listener t_client::v_keyboard_listener = {
 		static_cast<t_client*>(a_data)->v_xkb.f_repeat(a_rate, a_delay);
 	}
 };
+wl_data_device_listener t_client::v_data_device_listener = {
+	[](auto a_data, auto a_this, auto a_offer)
+	{
+		new t_data_offer(a_offer);
+	},
+	[](auto a_data, auto a_this, auto a_serial, auto a_surface, auto a_x, auto a_y, auto a_offer)
+	{
+		auto& self = *static_cast<t_client*>(a_data);
+		auto focus = static_cast<t_surface*>(wl_surface_get_user_data(a_surface));
+		self.v_pointer_focus = focus;
+		self.v_pointer_x = wl_fixed_to_double(a_x);
+		self.v_pointer_y = wl_fixed_to_double(a_y);
+		self.v_cursor_serial = a_serial;
+		self.v_drag.reset(static_cast<t_data_offer*>(wl_data_offer_get_user_data(a_offer)));
+		//if (auto& on = focus->v_on_drag_enter) on();
+	},
+	[](auto a_data, auto a_this)
+	{
+		auto& self = *static_cast<t_client*>(a_data);
+		if (auto focus = self.v_pointer_focus) {
+			//if (auto& on = focus->v_on_drag_leave) on();
+			self.v_pointer_focus = nullptr;
+		}
+		self.f_cursor__(nullptr);
+		self.v_drag.reset();
+	},
+	[](auto a_data, auto a_this, auto a_time, auto a_x, auto a_y)
+	{
+		auto& self = *static_cast<t_client*>(a_data);
+		self.v_pointer_x = wl_fixed_to_double(a_x);
+		self.v_pointer_y = wl_fixed_to_double(a_y);
+		//if (auto focus = self.v_pointer_focus) if (auto& on = focus->v_on_drag_motion) on();
+	},
+	[](auto a_data, auto a_this)
+	{
+		auto& self = *static_cast<t_client*>(a_data);
+		if (auto focus = self.v_pointer_focus) {
+			//if (auto& on = focus->v_on_drag_drop) on();
+			self.v_pointer_focus = nullptr;
+		}
+		self.f_cursor__(nullptr);
+		self.v_drag.reset();
+	},
+	[](auto a_data, auto a_this, auto a_offer)
+	{
+		auto& self = *static_cast<t_client*>(a_data);
+		self.v_selection.reset(a_offer ? static_cast<t_data_offer*>(wl_data_offer_get_user_data(a_offer)) : nullptr);
+		for (auto& on : self.v_on_selection) on();
+	}
+};
 xdg_wm_base_listener t_client::v_xdg_wm_base_listener = {
 	[](auto a_data, auto a_this, auto a_serial)
 	{
@@ -181,6 +232,9 @@ t_client::t_client(std::function<void(wl_registry*, uint32_t, const char*, uint3
 	wl_seat_add_listener(v_seat, &v_seat_listener, this);
 	v_cursor_theme = wl_cursor_theme_load(NULL, 24, v_shm);
 	if (!v_cursor_theme) throw std::runtime_error("cursor theme");
+	if (!v_data_device_manager) throw std::runtime_error("data_device_manager");
+	v_data_device = wl_data_device_manager_get_data_device(v_data_device_manager, v_seat);
+	wl_data_device_add_listener(v_data_device, &v_data_device_listener, this);
 	if (!v_xdg_wm_base) throw std::runtime_error("xdg_wm_base");
 	xdg_wm_base_add_listener(v_xdg_wm_base, &v_xdg_wm_base_listener, this);
 	v_egl_display = eglGetDisplay(v_display);
@@ -193,7 +247,7 @@ t_client::t_client(std::function<void(wl_registry*, uint32_t, const char*, uint3
 	loop.v_wait = [this, wait = std::move(loop.v_wait)]
 	{
 		if (wl_display_prepare_read(v_display) == 0) {
-			for (auto& x : v_on_idle) x();
+			for (auto& on : v_on_idle) on();
 		} else {
 			do if (wl_display_dispatch_pending(v_display) == -1) throw std::runtime_error("wl_display_dispatch_pending"); while (wl_display_prepare_read(v_display) != 0);
 			suisha::f_loop().f_more();
@@ -212,6 +266,7 @@ t_client::t_client(std::function<void(wl_registry*, uint32_t, const char*, uint3
 
 t_client::~t_client()
 {
+	while (!v_data_sources.empty()) delete *v_data_sources.begin();
 	v_instance = nullptr;
 	eglMakeCurrent(v_egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
 }
@@ -480,5 +535,58 @@ void t_input::f_disable()
 	f_reset();
 	if (auto& on = f_client().v_input_focus->v_on_input_disable) on();
 }
+
+wl_data_offer_listener t_data_offer::v_data_offer_listener = {
+	[](auto a_data, auto a_this, auto a_mime_type)
+	{
+		static_cast<t_data_offer*>(a_data)->v_mime_types.emplace(a_mime_type);
+	},
+	[](auto a_data, auto a_this, auto a_source_actions)
+	{
+	},
+	[](auto a_data, auto a_this, auto a_dnd_action)
+	{
+	}
+};
+
+wl_data_source_listener t_data_source::v_data_source_listener = {
+	[](auto a_data, auto a_this, auto a_mime_type)
+	{
+		// target
+	},
+	[](auto a_data, auto a_this, auto a_mime_type, auto a_fd)
+	{
+		auto& self = *static_cast<t_data_source*>(a_data);
+		auto i = self.v_offers.find(a_mime_type);
+		if (i == self.v_offers.end()) return f_close_or_throw(a_fd);
+		suisha::f_loop().f_poll(a_fd, POLLOUT, [a_fd, write = i->second()](auto a_events) mutable
+		{
+			if (!(a_events & POLLOUT)) return;
+			auto n = write(a_fd);
+			if (n == -1) {
+				std::fprintf(stderr, "write: %s\n", std::strerror(errno));
+			} else if (n <= 0) {
+				f_close_or_throw(a_fd);
+				suisha::f_loop().f_unpoll(a_fd);
+			}
+		});
+	},
+	[](auto a_data, auto a_this)
+	{
+		delete static_cast<t_data_source*>(a_data);
+	},
+	[](auto a_data, auto a_this)
+	{
+		// dnd_drop_performed
+	},
+	[](auto a_data, auto a_this)
+	{
+		// dnd_finished
+	},
+	[](auto a_data, auto a_this, auto a_dnd_action)
+	{
+		// action
+	}
+};
 
 }

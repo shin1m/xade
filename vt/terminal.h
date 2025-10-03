@@ -395,12 +395,9 @@ std::fprintf(stderr, "Device Status Report unknown parameter: %d\n", p);
 	void f_put(wchar_t a_c)
 	{
 		if (v_cursor_x >= f_width()) {
-			if (v_mode_wraparound) {
-				f_index();
-				v_cursor_x = 0;
-			} else {
-				v_cursor_x = f_width() - 1;
-			}
+			if (!v_mode_wraparound) return;
+			t_buffer<T_host>::f_wrap(v_cursor_y);
+			f_next_line();
 		}
 		v_cursor_x += t_buffer<T_host>::f_put(v_cursor_x, v_cursor_y, {a_c, v_attribute}, v_mode_insert);
 	}

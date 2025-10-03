@@ -156,8 +156,8 @@ t_window::t_code t_window::f_code(xkb_keysym_t a_key)
 void t_window::f_send(const char* a_cs, size_t a_n)
 {
 	while (a_n > 0) {
-		ssize_t n = write(v_master, a_cs, a_n);
-		if (n == ssize_t(-1)) {
+		auto n = write(v_master, a_cs, a_n);
+		if (n == -1) {
 std::fprintf(stderr, "write: %s\n", std::strerror(errno));
 			break;
 		}
@@ -274,6 +274,26 @@ void t_window::f_draw_content(SkCanvas& a_canvas)
 			a_canvas.drawIRect(SkIRect::MakeXYWH(x + 1, y + 1, width - 2, uh - 2), paint);
 		}
 	}
+	if (v_selection_anchor == v_selection_cursor) return;
+	auto [ax, ay, cx, cy] = f_selection();
+	ax *= v_unit.fWidth;
+	ay = ay * uh - v_position;
+	cx *= v_unit.fWidth;
+	cy = cy * uh - v_position;
+	paint.setStyle(SkPaint::kFill_Style);
+	paint.setBlendMode(SkBlendMode::kXor);
+	paint.setColor(0x7fffffff);
+	auto draw = [&](auto r)
+	{
+		if (!v_valid.contains(r)) a_canvas.drawIRect(r, paint);
+	};
+	if (ay < cy) {
+		draw(SkIRect::MakeLTRB(ax, ay, v_width, ay + uh));
+		while ((ay += uh) < cy) draw(SkIRect::MakeXYWH(0, ay, v_width, uh));
+		draw(SkIRect::MakeXYWH(0, cy, cx, uh));
+	} else {
+		draw(SkIRect::MakeLTRB(ax, ay, cx, cy + uh));
+	}
 }
 
 void t_window::f_draw_bar(SkCanvas& a_canvas)
@@ -388,6 +408,47 @@ void t_window::f_position__(int a_position)
 	v_position = a_position;
 	v_preedit_valid = v_bar_valid = false;
 	v_on_hover();
+}
+
+std::tuple<int, int> t_window::f_location_at_pointer() const
+{
+	auto frame = v_host.v_measure_frame();
+	int y = (f_client().f_pointer_y() - frame.fTop + v_position) / v_unit.fHeight;
+	if (y < 0) return {};
+	auto log = v_buffer.f_log_size();
+	if (auto n = log + v_buffer.f_height(); y >= n) return {0, n};
+	auto row = y < log ? v_buffer.f_log(y) : v_buffer.f_at(y - log);
+	int x = (f_client().f_pointer_x() - frame.fLeft) / v_unit.fWidth;
+	if (x < 0) return {0, y};
+	if (x >= row->v_size) return {row->v_size, y};
+	while (x > 0 && row->v_cells[x].v_c == L'\0') --x;
+	return {x, y};
+}
+
+void t_window::f_invalidate_selection()
+{
+	int log = v_buffer.f_log_size();
+	auto ay = std::get<1>(v_selection_anchor) - log;
+	auto cy = std::get<1>(v_selection_cursor) - log;
+	auto y = std::min(ay, cy);
+	f_invalidate(y, std::max(ay, cy) + 1 - y);
+}
+
+void t_window::f_select_from(const std::tuple<int, int>& a_location)
+{
+	if (a_location == v_selection_anchor && a_location == v_selection_cursor) return;
+	f_invalidate_selection();
+	v_selection_anchor = v_selection_cursor = a_location;
+	f_invalidate_selection();
+}
+
+void t_window::f_select_to()
+{
+	auto location = f_location_at_pointer();
+	if (location == v_selection_cursor) return;
+	f_invalidate_selection();
+	v_selection_cursor = location;
+	f_invalidate_selection();
 }
 
 t_window::t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const SkFont& a_font, t_host& a_host) :
@@ -536,6 +597,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			ws.ws_row = v_buffer.f_height();
 			ws.ws_xpixel = ws.ws_ypixel = 0;
 			ioctl(v_master, TIOCSWINSZ, &ws);
+			f_select_from({});
 		}
 		v_valid.setEmpty();
 		v_preedit_valid = v_bar_valid = false;
@@ -596,6 +658,80 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 			size_t i = 0;
 			if (xkb_state_mod_name_is_active(f_client(), XKB_MOD_NAME_SHIFT, XKB_STATE_MODS_EFFECTIVE) > 0) i |= 1;
 			if (xkb_state_mod_name_is_active(f_client(), XKB_MOD_NAME_CTRL, XKB_STATE_MODS_EFFECTIVE) > 0) i |= 2;
+			if (code == t_code::c_INSERT) {
+				if (i == 1) {
+					if (auto p = f_client().f_selection(); p && p->f_mime_types().contains("text/plain")) p->f_receive("text/plain", [&, utf8 = std::array<char, 1024>(), utf8n = size_t(0)](auto a_fd) mutable
+					{
+						auto n = read(a_fd, utf8.data() + utf8n, utf8.size() - utf8n);
+						if (n < 0) return n;
+						utf8n += n;
+						auto p = utf8.data();
+						auto e = v_utf8tomb.f_to<char>(&p, &utf8n, [&](auto a_p, auto a_n)
+						{
+							f_send(a_p, a_n);
+						});
+						if (e == EINVAL)
+							std::copy_n(p, utf8n, utf8.data());
+						else if (e != 0)
+							throw std::system_error(e, std::generic_category());
+						return n;
+					}, [&]
+					{
+						auto e = v_utf8tomb.f_to<char>(nullptr, nullptr, [&](auto a_p, auto a_n)
+						{
+							f_send(a_p, a_n);
+						});
+						if (e != 0) throw std::system_error(e, std::generic_category());
+					});
+					return;
+				} else if (i == 2) {
+					if (v_selection_anchor == v_selection_cursor) return;
+					std::vector<char> cs;
+					{
+						auto out = [&](auto a_p, auto a_n)
+						{
+							cs.insert(cs.end(), a_p, a_p + a_n);
+						};
+						t_encoder<decltype(out)> encoder(out, "utf-8");
+						auto put = [&](auto p, auto q)
+						{
+							while (p != q) {
+								encoder(p->v_c);
+								do ++p; while (p != q && p->v_c == L'\0');
+							}
+						};
+						auto [ax, ay, cx, cy] = f_selection();
+						auto log = v_buffer.f_log_size();
+						auto row = ay < log ? v_buffer.f_log(ay) : v_buffer.f_at(ay - log);
+						if (ay < cy) {
+							put(row->v_cells + ax, row->v_cells + row->v_size);
+							if (!row->v_wrapped) encoder(L'\n');
+							while (++ay < cy) {
+								row = ay < log ? v_buffer.f_log(ay) : v_buffer.f_at(ay - log);
+								put(row->v_cells, row->v_cells + row->v_size);
+								if (!row->v_wrapped) encoder(L'\n');
+							}
+							row = ay < log ? v_buffer.f_log(ay) : v_buffer.f_at(ay - log);
+							put(row->v_cells, row->v_cells + cx);
+						} else {
+							put(row->v_cells + ax, row->v_cells + cx);
+						}
+					}
+					auto source = std::make_unique<t_data_source>();
+					source->f_offer("text/plain", [cs = std::move(cs)]
+					{
+						return [p = cs.data(), size = cs.size()](auto a_fd) mutable -> ssize_t
+						{
+							auto n = write(a_fd, p, size);
+							if (n == -1) return n;
+							p += n;
+							return size -= n;
+						};
+					});
+					f_client().f_set_selection(std::move(source));
+					return;
+				}
+			}
 			const char* cs = v_buffer.f_code(code, i);
 			f_send(cs, std::strlen(cs));
 		} else if (a_c != L'\0') {
@@ -618,7 +754,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	v_host.v_surface.v_on_input_done = [&]
 	{
 		auto& text = v_host.v_surface.f_input()->f_text();
-		v_utf8tomb(text.c_str(), text.size(), [&](auto a_p, auto a_n)
+		v_utf8tomb(text.data(), text.size(), [&](auto a_p, auto a_n)
 		{
 			f_send(a_p, a_n);
 		});
@@ -630,7 +766,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		{
 			v_preedit_text.insert(v_preedit_text.end(), a_p, a_p + a_n);
 		};
-		auto p = preedit.c_str();
+		auto p = preedit.data();
 		if (begin < 0) {
 			v_preedit_begin = begin;
 			begin = 0;
@@ -768,6 +904,14 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		v_on_hover = v_host.v_surface.v_on_pointer_move = hover;
 		int delta;
 		switch (v_hovered) {
+		case c_part__CONTENT:
+			f_select_from(f_location_at_pointer());
+			v_host.v_surface.v_on_pointer_move = [&]
+			{
+				f_select_to();
+			};
+			v_host.v_surface.v_on_button_release = release;
+			return;
 		case c_part__BUTTON_UP:
 			delta = -v_unit.fHeight;
 			break;
@@ -823,8 +967,8 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 	suisha::f_loop().f_poll(a_master, POLLIN, [&](auto a_events)
 	{
 		if (!(a_events & POLLIN)) return;
-		ssize_t n = read(v_master, v_mbs + v_mbn, sizeof(v_mbs) - v_mbn);
-		if (n == ssize_t(-1)) {
+		auto n = read(v_master, v_mbs + v_mbn, sizeof(v_mbs) - v_mbn);
+		if (n == -1) {
 			std::fprintf(stderr, "read: %s\n", std::strerror(errno));
 			return;
 		}
@@ -854,6 +998,7 @@ v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new 
 		v_mbn = q - p;
 		f_invalidate(v_buffer.f_cursor_y(), 1);
 		v_preedit_valid = false;
+		f_select_from({});
 	});
 }
 

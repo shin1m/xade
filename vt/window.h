@@ -54,6 +54,8 @@ class t_window
 	std::tuple<int, int> v_preedit_cursor;
 	bool v_preedit_valid = false;
 	int v_position = 0;
+	std::tuple<int, int> v_selection_anchor;
+	std::tuple<int, int> v_selection_cursor;
 	GLuint v_renderbuffer = 0;
 	GLuint v_framebuffer = 0;
 	sk_sp<GrDirectContext> v_context;
@@ -95,7 +97,16 @@ class t_window
 		return v_buffer.f_log_size() * v_unit.fHeight + v_height;
 	}
 	void f_position__(int a_position);
-	void f_input_state();
+	std::tuple<int, int> f_location_at_pointer() const;
+	void f_invalidate_selection();
+	void f_select_from(const std::tuple<int, int>& a_location);
+	void f_select_to();
+	std::tuple<int, int, int, int> f_selection() const
+	{
+		auto [ax, ay] = v_selection_anchor;
+		auto [cx, cy] = v_selection_cursor;
+		return (ay == cy ? ax > cx : ay > cy) ? std::make_tuple(cx, cy, ax, ay) : std::make_tuple(ax, ay, cx, cy);
+	}
 
 public:
 	struct t_host

@@ -1,5 +1,4 @@
 #include "layered.h"
-#include <cstring>
 #include <linux/input-event-codes.h>
 #include <xkbcommon/xkbcommon-keysyms.h>
 

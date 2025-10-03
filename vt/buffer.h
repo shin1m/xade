@@ -238,6 +238,10 @@ protected:
 		}
 		v_host.f_invalidate(a_y, 1);
 	}
+	void f_wrap(unsigned a_y)
+	{
+		v_current->v_rows[a_y]->v_wrapped = true;
+	}
 
 public:
 	t_buffer(T_host& a_host, unsigned a_log, unsigned a_width, unsigned a_height) : v_host(a_host), v_log_capacity(a_log), v_width(a_width), v_height(a_height)

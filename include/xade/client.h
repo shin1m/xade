@@ -2,6 +2,9 @@
 #define XADE__CLIENT_H
 
 #include <list>
+#include <map>
+#include <set>
+#include <cstring>
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 #include <wayland-egl.h>
@@ -20,6 +23,8 @@ using namespace std::chrono_literals;
 class t_surface;
 class t_cursor;
 class t_input;
+class t_data_offer;
+class t_data_source;
 
 class t_xkb
 {
@@ -85,11 +90,13 @@ class t_client
 	friend t_client& f_client();
 	friend class t_frame;
 	friend class t_input;
+	friend class t_data_source;
 
 	static wl_registry_listener v_registry_listener;
 	static wl_seat_listener v_seat_listener;
 	static wl_pointer_listener v_pointer_listener;
 	static wl_keyboard_listener v_keyboard_listener;
+	static wl_data_device_listener v_data_device_listener;
 	static xdg_wm_base_listener v_xdg_wm_base_listener;
 	static inline t_client* v_instance;
 
@@ -103,6 +110,8 @@ class t_client
 	t_owner<wl_cursor_theme*, wl_cursor_theme_destroy> v_cursor_theme;
 	t_owner<wl_keyboard*, wl_keyboard_release> v_keyboard;
 	t_xkb v_xkb;
+	t_owner<wl_data_device_manager*, wl_data_device_manager_destroy> v_data_device_manager;
+	t_owner<wl_data_device*, wl_data_device_release> v_data_device;
 	t_owner<xdg_wm_base*, xdg_wm_base_destroy> v_xdg_wm_base;
 	t_owner<EGLDisplay, eglTerminate, EGL_NO_DISPLAY> v_egl_display;
 	t_surface* v_pointer_focus = nullptr;
@@ -115,9 +124,13 @@ class t_client
 	t_surface* v_keyboard_focus = nullptr;
 	t_owner<zwp_text_input_manager_v3*, zwp_text_input_manager_v3_destroy> v_text_input_manager;
 	t_surface* v_input_focus = nullptr;
+	std::unique_ptr<t_data_offer> v_drag;
+	std::unique_ptr<t_data_offer> v_selection;
+	std::set<t_data_source*> v_data_sources;
 
 public:
 	std::list<std::function<void()>> v_on_idle;
+	std::list<std::function<void()>> v_on_selection;
 
 	t_client(std::function<void(wl_registry*, uint32_t, const char*, uint32_t)>&& a_on_global = {});
 	~t_client();
@@ -171,6 +184,11 @@ public:
 		return v_input_focus;
 	}
 	std::shared_ptr<t_input> f_new_input();
+	t_data_offer* f_selection() const
+	{
+		return v_selection.get();
+	}
+	void f_set_selection(std::unique_ptr<t_data_source>&& a_source);
 };
 
 inline t_client& f_client()
@@ -379,6 +397,77 @@ public:
 		return v_delete;
 	}
 };
+
+inline void f_close_or_throw(int a_fd)
+{
+	while (close(a_fd) == -1) if (errno != EINTR) throw std::system_error(errno, std::generic_category());
+}
+
+class t_data_offer
+{
+	static wl_data_offer_listener v_data_offer_listener;
+
+	t_owner<wl_data_offer*, wl_data_offer_destroy> v_offer;
+	std::set<std::string> v_mime_types;
+
+public:
+	t_data_offer(wl_data_offer* a_offer) : v_offer(a_offer)
+	{
+		wl_data_offer_add_listener(v_offer, &v_data_offer_listener, this);
+	}
+	const std::set<std::string>& f_mime_types() const
+	{
+		return v_mime_types;
+	}
+	void f_receive(const char* a_mime_type, auto&& a_read, auto&& a_done)
+	{
+		int fds[2];
+		if (pipe(fds) == -1) throw std::system_error(errno, std::generic_category());
+		wl_data_offer_receive(v_offer, a_mime_type, fds[1]);
+		f_close_or_throw(fds[1]);
+		suisha::f_loop().f_poll(fds[0], POLLIN, [read = std::move(a_read), done = std::move(a_done), fd = fds[0]](auto a_events) mutable
+		{
+			if (a_events & POLLIN) {
+				if (read(fd) == -1) std::fprintf(stderr, "read: %s\n", std::strerror(errno));
+			} else if (a_events & POLLHUP) {
+				done();
+				f_close_or_throw(fd);
+				suisha::f_loop().f_unpoll(fd);
+			}
+		});
+	}
+};
+
+class t_data_source
+{
+	friend class t_client;
+
+	static wl_data_source_listener v_data_source_listener;
+
+	t_owner<wl_data_source*, wl_data_source_destroy> v_source;
+	std::map<std::string, std::function<std::function<ssize_t(int32_t)>()>> v_offers;
+
+public:
+	t_data_source() : v_source(wl_data_device_manager_create_data_source(f_client().v_data_device_manager))
+	{
+		f_client().v_data_sources.insert(this);
+		wl_data_source_add_listener(v_source, &v_data_source_listener, this);
+	}
+	~t_data_source()
+	{
+		f_client().v_data_sources.erase(this);
+	}
+	void f_offer(const char* a_mime_type, auto&& a_write)
+	{
+		v_offers.emplace(a_mime_type, std::move(a_write));
+		wl_data_source_offer(v_source, a_mime_type);
+	}
+};
+
+inline void t_client::f_set_selection(std::unique_ptr<t_data_source>&& a_source)
+{
+	wl_data_device_set_selection(v_data_device, a_source ? static_cast<wl_data_source*>(a_source.release()->v_source) : NULL, v_action_serial);
+}
 
 #pragma GCC diagnostic pop
 
