@@ -3,7 +3,6 @@
 #include <pty.h>
 #include <signal.h>
 #ifdef XADE__UTMP
-#include <cstring>
 #include <pwd.h>
 #include <utmp.h>
 #endif

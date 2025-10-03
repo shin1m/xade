@@ -44,7 +44,7 @@ public:
 };
 
 template<typename C0, typename C1>
-struct t_converter : private t_iconv
+struct t_converter : t_iconv
 {
 	using t_iconv::t_iconv;
 	const C0* operator()(const C0* a_p, size_t a_n, auto a_out) const
