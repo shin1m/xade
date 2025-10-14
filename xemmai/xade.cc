@@ -20,6 +20,10 @@ t_session::t_session() : t_client([&](auto a_this, auto a_name, auto a_interface
 	{
 		if (auto& on = v_object->f_fields()[/*on_idle*/0]) on();
 	});
+	v_on_selection.push_back([&]
+	{
+		if (auto& on = v_object->f_fields()[/*on_selection*/1]) on();
+	});
 	v_instance = this;
 }
 

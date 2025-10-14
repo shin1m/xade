@@ -1,5 +1,63 @@
 #include "client.h"
 
+namespace xemmaix::xade
+{
+
+void f_receive(t_data_offer& a_offer, std::wstring_view a_mime_type, const t_pvalue& a_done)
+{
+	auto mime_type = portable::f_convert(a_mime_type);
+	if (!a_offer.f_mime_types().contains(mime_type.c_str())) f_throw(L"no mime type"sv);
+	auto data = std::make_shared<std::tuple<t_root, size_t>>(t_bytes::f_instantiate(t_object::f_size_to_capacity<t_bytes, unsigned char>(sizeof(t_object))), 0);
+	a_offer.f_receive(mime_type.c_str(), [data](auto a_fd) mutable
+	{
+		auto& [buffer, size] = *data;
+		if (auto& bytes = buffer->f_as<t_bytes>(); size >= bytes.f_size()) {
+			auto p = t_bytes::f_instantiate(t_object::f_size_to_capacity<t_bytes, unsigned char>(t_object::f_capacity_to_size<t_bytes, unsigned char>(size) * 2));
+			std::copy_n(&bytes[0], size, &p->f_as<t_bytes>()[0]);
+			buffer = p;
+		}
+		auto& bytes = buffer->f_as<t_bytes>();
+		auto n = read(a_fd, &bytes[size], bytes.f_size() - size);
+		if (n < 0) return n;
+		size += n;
+		return n;
+	}, [done = t_rvalue(a_done), data]
+	{
+		auto& [buffer, size] = *data;
+		done(buffer, size);
+	});
+}
+
+std::unique_ptr<t_data_source> f_new_data_source(t_map& a_offers)
+{
+	auto source = std::make_unique<t_data_source>();
+	a_offers.f_owned_or_shared<t_shared_lock_with_safe_region>([&]
+	{
+		for (t_map::t_iterator i(a_offers); i.f_entry(); i.f_next()) {
+			auto& x = i.f_entry()->f_key();
+			xemmai::f_check<t_string>(x, L"key");
+			source->f_offer(portable::f_convert(x->f_as<t_string>()).c_str(), [get = t_rvalue(i.f_entry()->v_value)]
+			{
+				auto data = get();
+				auto bytes = data.f_get_at(0);
+				xemmai::f_check<t_bytes>(bytes, L"data[0]");
+				auto size = data.f_get_at(1);
+				xemmai::f_check<size_t>(size, L"data[1]");
+				return [bytes = t_root(bytes), p = &bytes->f_as<t_bytes>()[0], size = f_as<size_t>(size)](auto a_fd) mutable -> ssize_t
+				{
+					auto n = write(a_fd, p, size);
+					if (n == -1) return n;
+					p += n;
+					return size -= n;
+				};
+			});
+		}
+	});
+	return source;
+}
+
+}
+
 namespace xemmai
 {
 
@@ -8,13 +66,27 @@ void t_type_of<xemmaix::xade::t_client>::f_define(t_library* a_library)
 	using xemmaix::xade::t_client;
 	t_define{a_library}
 	(L"on_idle"sv)
-	(L"pointer_focus"sv, t_member<t_object*(t_client::*)(), &t_client::f_pointer_focus>())
-	(L"pointer"sv, t_member<t_object*(t_client::*)(), &t_client::f_pointer>())
-	(L"keyboard_focus"sv, t_member<t_object*(t_client::*)(), &t_client::f_keyboard_focus>())
-	(L"cursor"sv, t_member<t_object*(t_client::*)(), &t_client::f_cursor>())
+	(L"on_selection"sv)
+	(L"pointer_focus"sv, t_member<t_object*(t_client::*)() const, &t_client::f_pointer_focus>())
+	(L"pointer"sv, t_member<t_object*(t_client::*)() const, &t_client::f_pointer>())
+	(L"keyboard_focus"sv, t_member<t_object*(t_client::*)() const, &t_client::f_keyboard_focus>())
+	(L"cursor"sv, t_member<t_object*(t_client::*)() const, &t_client::f_cursor>())
 	(L"cursor__"sv, t_member<void(t_client::*)(const xemmaix::xade::t_cursor*), &t_client::f_cursor__>())
-	(L"input_focus"sv, t_member<t_object*(t_client::*)(), &t_client::f_input_focus>())
+	(L"input_focus"sv, t_member<t_object*(t_client::*)() const, &t_client::f_input_focus>())
 	(L"new_input"sv, t_member<std::shared_ptr<::xade::t_input>(t_client::*)(), &t_client::f_new_input>())
+	(L"drag_offers"sv, t_member<bool(t_client::*)() const, &t_client::f_drag_offers>())
+	(L"drag_has"sv, t_member<bool(t_client::*)(std::wstring_view) const, &t_client::f_drag_has>())
+	(L"drag_accept"sv, t_member<void(t_client::*)(const t_string*), &t_client::f_drag_accept>())
+	(L"drag_source_actions"sv, t_member<uint32_t(t_client::*)() const, &t_client::f_drag_source_actions>())
+	(L"drag_dnd_action"sv, t_member<uint32_t(t_client::*)() const, &t_client::f_drag_dnd_action>())
+	(L"drag_set_actions"sv, t_member<void(t_client::*)(uint32_t, uint32_t), &t_client::f_drag_set_actions>())
+	(L"drag_receive"sv, t_member<void(t_client::*)(std::wstring_view, const t_pvalue&) const, &t_client::f_drag_receive>())
+	(L"drag_finish"sv, t_member<void(t_client::*)(), &t_client::f_drag_finish>())
+	(L"drag_cancel"sv, t_member<void(t_client::*)(), &t_client::f_drag_finish>())
+	(L"selection_has"sv, t_member<bool(t_client::*)(std::wstring_view) const, &t_client::f_selection_has>())
+	(L"selection_receive"sv, t_member<void(t_client::*)(std::wstring_view, const t_pvalue&) const, &t_client::f_selection_receive>())
+	(L"selection_set"sv, t_member<void(t_client::*)(t_map&, const t_pvalue&), &t_client::f_selection_set>())
+	(L"selection_clear"sv, t_member<void(t_client::*)(), &t_client::f_selection_clear>())
 	.f_derive<t_client, t_object>();
 }
 
@@ -48,6 +120,10 @@ void t_type_of<xemmaix::xade::t_surface>::f_define(t_library* a_library)
 	(L"on_input_enable"sv)
 	(L"on_input_disable"sv)
 	(L"on_input_done"sv)
+	(L"on_drag_enter"sv)
+	(L"on_drag_leave"sv)
+	(L"on_drag_motion"sv)
+	(L"on_drag_drop"sv)
 	(L"commit"sv, t_member<void(*)(t_surface&), [](auto a_this)
 	{
 		wl_surface_commit(a_this);
@@ -59,6 +135,26 @@ void t_type_of<xemmaix::xade::t_surface>::f_define(t_library* a_library)
 	(L"request_frame"sv, t_member<void(xade::t_surface::*)(), &t_surface::f_request_frame>())
 	(L"input"sv, t_member<const std::shared_ptr<xade::t_input>&(xade::t_surface::*)() const, &t_surface::f_input>())
 	(L"input__"sv, t_member<void(xade::t_surface::*)(const std::shared_ptr<xade::t_input>&), &t_surface::f_input__>())
+	(L"drag_start"sv, t_member<void(*)(t_surface&, t_surface*), [](auto a_this, auto a_icon)
+	{
+		a_this.f_start_drag({}, a_icon);
+	}>(), t_member<void(*)(t_library*, t_surface&, t_map&, uint32_t, const t_pvalue&, const t_pvalue&, const t_pvalue&, const t_pvalue&, const t_pvalue&, t_surface*), [](auto a_library, auto a_this, auto a_offers, auto a_actions, auto a_on_target, auto a_on_cancelled, auto a_on_dnd_drop_performed, auto a_on_dnd_finished, auto a_on_action, auto a_icon)
+	{
+		auto source = xemmaix::xade::f_new_data_source(a_offers);
+		source->f_set_actions(a_actions);
+		if (a_on_target) source->v_on_target = [=, on = t_rvalue(a_on_target)](auto a_mime_type)
+		{
+			on(a_library->f_as(portable::f_convert(a_mime_type)));
+		};
+		if (a_on_cancelled) source->v_on_cancelled = t_rvalue(a_on_cancelled);
+		if (a_on_dnd_drop_performed) source->v_on_dnd_drop_performed = t_rvalue(a_on_dnd_drop_performed);
+		if (a_on_dnd_finished) source->v_on_dnd_finished = t_rvalue(a_on_dnd_finished);
+		if (a_on_action) source->v_on_action = [=, on = t_rvalue(a_on_action)](auto a_dnd_action)
+		{
+			on(a_library->f_as(a_dnd_action));
+		};
+		a_this.f_start_drag(std::move(source), a_icon);
+	}>())
 	.f_derive<t_surface, xemmaix::xade::t_proxy>();
 }
 

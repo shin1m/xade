@@ -7,28 +7,98 @@
 namespace xemmaix::xade
 {
 
+void f_receive(t_data_offer& a_offer, std::wstring_view a_mime_type, const t_pvalue& a_done);
+std::unique_ptr<t_data_source> f_new_data_source(t_map& a_offers);
+
 struct t_client
 {
 	t_session* v_client = t_session::f_instance();
 
-	void f_check()
+	void f_check() const
 	{
 		if (!v_client || v_client != t_session::f_instance()) f_throw(L"not valid."sv);
 	}
-	t_object* f_pointer_focus();
-	t_object* f_pointer()
+	t_object* f_pointer_focus() const;
+	t_object* f_pointer() const
 	{
 		f_check();
 		return f_tuple(v_client->f_pointer_x(), v_client->f_pointer_y());
 	}
-	t_object* f_keyboard_focus();
-	t_object* f_cursor();
+	t_object* f_keyboard_focus() const;
+	t_object* f_cursor() const;
 	void f_cursor__(const t_cursor* a_value);
-	t_object* f_input_focus();
+	t_object* f_input_focus() const;
 	std::shared_ptr<::xade::t_input> f_new_input()
 	{
 		f_check();
 		return v_client->f_new_input();
+	}
+	bool f_drag_offers() const
+	{
+		f_check();
+		return v_client->f_drag();
+	}
+	t_drag_offer& f_drag() const
+	{
+		f_check();
+		if (auto p = v_client->f_drag()) return *p;
+		f_throw(L"no drag"sv);
+	}
+	bool f_drag_has(std::wstring_view a_mime_type) const
+	{
+		return f_drag().f_mime_types().contains(portable::f_convert(a_mime_type).c_str());
+	}
+	void f_drag_accept(const t_string* a_mime_type)
+	{
+		f_drag().f_accept(a_mime_type ? portable::f_convert(*a_mime_type).c_str() : NULL);
+	}
+	uint32_t f_drag_source_actions() const
+	{
+		return f_drag().f_source_actions();
+	}
+	uint32_t f_drag_dnd_action() const
+	{
+		return f_drag().f_dnd_action();
+	}
+	void f_drag_set_actions(uint32_t a_dnd_actions, uint32_t a_preferred_action)
+	{
+		return f_drag().f_set_actions(a_dnd_actions, a_preferred_action);
+	}
+	void f_drag_receive(std::wstring_view a_mime_type, const t_pvalue& a_done) const
+	{
+		return f_receive(f_drag(), a_mime_type, a_done);
+	}
+	void f_drag_finish()
+	{
+		return f_drag().f_finish();
+	}
+	void f_drag_cancel()
+	{
+		return f_drag().f_cancel();
+	}
+	bool f_selection_has(std::wstring_view a_mime_type) const
+	{
+		f_check();
+		auto p = v_client->f_selection();
+		return p && p->f_mime_types().contains(portable::f_convert(a_mime_type).c_str());
+	}
+	void f_selection_receive(std::wstring_view a_mime_type, const t_pvalue& a_done) const
+	{
+		f_check();
+		if (auto p = v_client->f_selection()) return f_receive(*p, a_mime_type, a_done);
+		f_throw(L"no selection"sv);
+	}
+	void f_selection_set(t_map& a_offers, const t_pvalue& a_on_cancelled)
+	{
+		f_check();
+		auto source = xemmaix::xade::f_new_data_source(a_offers);
+		if (a_on_cancelled) source->v_on_cancelled = t_rvalue(a_on_cancelled);
+		v_client->f_set_selection(std::move(source));
+	}
+	void f_selection_clear()
+	{
+		f_check();
+		v_client->f_set_selection({});
 	}
 };
 
@@ -52,7 +122,11 @@ struct t_client
 		XEMMAIX__XADE__ON(key_repeat, (auto a_sym, auto a_c), 11, a_sym, a_c)\
 		XEMMAIX__XADE__ON(input_enable, , 12, )\
 		XEMMAIX__XADE__ON(input_disable, , 13, )\
-		XEMMAIX__XADE__ON(input_done, , 14, )
+		XEMMAIX__XADE__ON(input_done, , 14, )\
+		XEMMAIX__XADE__ON(drag_enter, , 15, )\
+		XEMMAIX__XADE__ON(drag_leave, , 16, )\
+		XEMMAIX__XADE__ON(drag_motion, , 17, )\
+		XEMMAIX__XADE__ON(drag_drop, , 18, )
 
 struct t_surface : t_proxy_of<::xade::t_surface>
 {
@@ -69,7 +143,7 @@ struct t_frame : t_proxy_of<::xade::t_frame>
 		XEMMAIX__XADE__SURFACE__ONS
 		v_on_measure = [&](auto& a_width, auto& a_height)
 		{
-			if (auto& on = t_object::f_of(this)->f_fields()[15]) {
+			if (auto& on = t_object::f_of(this)->f_fields()[19]) {
 				auto size = on(a_width, a_height);
 				auto width = size.f_get_at(0);
 				xemmai::f_check<int32_t>(width, L"width");
@@ -79,9 +153,9 @@ struct t_frame : t_proxy_of<::xade::t_frame>
 				a_height = f_as<int32_t>(height);
 			}
 		};
-		XEMMAIX__XADE__ON(map, (auto a_width, auto a_height), 16, a_width, a_height)
-		XEMMAIX__XADE__ON(unmap, , 17, )
-		XEMMAIX__XADE__ON(close, , 18, )
+		XEMMAIX__XADE__ON(map, (auto a_width, auto a_height), 20, a_width, a_height)
+		XEMMAIX__XADE__ON(unmap, , 21, )
+		XEMMAIX__XADE__ON(close, , 22, )
 	}
 };
 
@@ -147,19 +221,19 @@ struct t_input : t_proxy_of<std::shared_ptr<::xade::t_input>>
 	}
 };
 
-inline t_object* t_client::f_pointer_focus()
+inline t_object* t_client::f_pointer_focus() const
 {
 	f_check();
 	return t_object::f_of(static_cast<t_surface*>(v_client->f_pointer_focus()));
 }
 
-inline t_object* t_client::f_keyboard_focus()
+inline t_object* t_client::f_keyboard_focus() const
 {
 	f_check();
 	return t_object::f_of(static_cast<t_surface*>(v_client->f_keyboard_focus()));
 }
 
-inline t_object* t_client::f_cursor()
+inline t_object* t_client::f_cursor() const
 {
 	f_check();
 	return t_object::f_of(const_cast<t_cursor*>(static_cast<const t_cursor*>(v_client->f_cursor())));
@@ -171,7 +245,7 @@ inline void t_client::f_cursor__(const t_cursor* a_value)
 	v_client->f_cursor__(a_value);
 }
 
-inline t_object* t_client::f_input_focus()
+inline t_object* t_client::f_input_focus() const
 {
 	f_check();
 	return t_object::f_of(static_cast<t_surface*>(v_client->f_input_focus()));

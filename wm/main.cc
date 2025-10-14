@@ -106,6 +106,7 @@ struct t_server
 	wl_listener v_new_input;
 	wl_listener v_request_set_cursor;
 	wl_listener v_request_set_selection;
+	wl_listener v_request_start_drag;
 	wl_list v_keyboards;
 	static void f_on_unmap_none(wlr_xdg_surface* a_surface)
 	{
@@ -1192,6 +1193,14 @@ t_server::t_server() : v_backend(wlr_backend_autocreate(wl_display_get_event_loo
 		wlr_seat_set_selection(self->v_seat, event->source, event->serial);
 	};
 	wl_signal_add(&v_seat->events.request_set_selection, &v_request_set_selection);
+	v_request_start_drag.notify = [](auto a_listener, auto a_data)
+	{
+		t_server* self = wl_container_of(a_listener, self, v_request_start_drag);
+		auto event = static_cast<wlr_seat_request_start_drag_event*>(a_data);
+		wlr_seat_start_pointer_drag(self->v_seat, event->drag, event->serial);
+		self->v_on_cursor_motion = self->v_on_cursor_motion_forward;
+	};
+	wl_signal_add(&v_seat->events.request_start_drag, &v_request_start_drag);
 	v_input_method_manager = wlr_input_method_manager_v2_create(v_display);
 	v_input_method_input_method.notify = [](auto a_listener, auto a_data)
 	{
@@ -1273,6 +1282,7 @@ t_server::~t_server()
 	wl_list_remove(&v_new_input.link);
 	wl_list_remove(&v_request_set_cursor.link);
 	wl_list_remove(&v_request_set_selection.link);
+	wl_list_remove(&v_request_start_drag.link);
 	wl_list_remove(&v_input_method_input_method.link);
 	wl_list_remove(&v_text_input_text_input.link);
 	wl_list_remove(&v_keyboard_state_focus_change.link);

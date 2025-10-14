@@ -164,7 +164,7 @@ wl_keyboard_listener t_client::v_keyboard_listener = {
 wl_data_device_listener t_client::v_data_device_listener = {
 	[](auto a_data, auto a_this, auto a_offer)
 	{
-		new t_data_offer(a_offer);
+		new t_drag_offer(a_offer);
 	},
 	[](auto a_data, auto a_this, auto a_serial, auto a_surface, auto a_x, auto a_y, auto a_offer)
 	{
@@ -173,41 +173,38 @@ wl_data_device_listener t_client::v_data_device_listener = {
 		self.v_pointer_focus = focus;
 		self.v_pointer_x = wl_fixed_to_double(a_x);
 		self.v_pointer_y = wl_fixed_to_double(a_y);
-		self.v_cursor_serial = a_serial;
-		self.v_drag.reset(static_cast<t_data_offer*>(wl_data_offer_get_user_data(a_offer)));
-		//if (auto& on = focus->v_on_drag_enter) on();
+		self.v_action_serial = a_serial;
+		self.v_drag.reset(a_offer ? static_cast<t_drag_offer*>(wl_data_offer_get_user_data(a_offer)) : nullptr);
+		if (auto& on = focus->v_on_drag_enter) on();
 	},
 	[](auto a_data, auto a_this)
 	{
 		auto& self = *static_cast<t_client*>(a_data);
 		if (auto focus = self.v_pointer_focus) {
-			//if (auto& on = focus->v_on_drag_leave) on();
+			if (auto& on = focus->v_on_drag_leave) on();
 			self.v_pointer_focus = nullptr;
+			self.v_drag.reset();
 		}
-		self.f_cursor__(nullptr);
-		self.v_drag.reset();
 	},
 	[](auto a_data, auto a_this, auto a_time, auto a_x, auto a_y)
 	{
 		auto& self = *static_cast<t_client*>(a_data);
 		self.v_pointer_x = wl_fixed_to_double(a_x);
 		self.v_pointer_y = wl_fixed_to_double(a_y);
-		//if (auto focus = self.v_pointer_focus) if (auto& on = focus->v_on_drag_motion) on();
+		if (auto focus = self.v_pointer_focus) if (auto& on = focus->v_on_drag_motion) on();
 	},
 	[](auto a_data, auto a_this)
 	{
 		auto& self = *static_cast<t_client*>(a_data);
 		if (auto focus = self.v_pointer_focus) {
-			//if (auto& on = focus->v_on_drag_drop) on();
+			if (auto& on = focus->v_on_drag_drop) on();
 			self.v_pointer_focus = nullptr;
 		}
-		self.f_cursor__(nullptr);
-		self.v_drag.reset();
 	},
 	[](auto a_data, auto a_this, auto a_offer)
 	{
 		auto& self = *static_cast<t_client*>(a_data);
-		self.v_selection.reset(a_offer ? static_cast<t_data_offer*>(wl_data_offer_get_user_data(a_offer)) : nullptr);
+		self.v_selection.reset(a_offer ? static_cast<t_drag_offer*>(wl_data_offer_get_user_data(a_offer)) : nullptr);
 		for (auto& on : self.v_on_selection) on();
 	}
 };
@@ -543,16 +540,18 @@ wl_data_offer_listener t_data_offer::v_data_offer_listener = {
 	},
 	[](auto a_data, auto a_this, auto a_source_actions)
 	{
+		static_cast<t_data_offer*>(a_data)->v_source_actions = a_source_actions;
 	},
 	[](auto a_data, auto a_this, auto a_dnd_action)
 	{
+		static_cast<t_data_offer*>(a_data)->v_dnd_action = a_dnd_action;
 	}
 };
 
 wl_data_source_listener t_data_source::v_data_source_listener = {
 	[](auto a_data, auto a_this, auto a_mime_type)
 	{
-		// target
+		if (auto& on = static_cast<t_data_source*>(a_data)->v_on_target) on(a_mime_type);
 	},
 	[](auto a_data, auto a_this, auto a_mime_type, auto a_fd)
 	{
@@ -573,19 +572,23 @@ wl_data_source_listener t_data_source::v_data_source_listener = {
 	},
 	[](auto a_data, auto a_this)
 	{
-		delete static_cast<t_data_source*>(a_data);
+		auto self = static_cast<t_data_source*>(a_data);
+		if (auto& on = self->v_on_cancelled) on();
+		delete self;
 	},
 	[](auto a_data, auto a_this)
 	{
-		// dnd_drop_performed
+		if (auto& on = static_cast<t_data_source*>(a_data)->v_on_dnd_drop_performed) on();
 	},
 	[](auto a_data, auto a_this)
 	{
-		// dnd_finished
+		auto self = static_cast<t_data_source*>(a_data);
+		if (auto& on = self->v_on_dnd_finished) on();
+		delete self;
 	},
 	[](auto a_data, auto a_this, auto a_dnd_action)
 	{
-		// action
+		if (auto& on = static_cast<t_data_source*>(a_data)->v_on_action) on(a_dnd_action);
 	}
 };
 

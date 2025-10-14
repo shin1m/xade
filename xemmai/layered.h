@@ -13,7 +13,7 @@ struct t_layered : t_proxy_of<::xade::t_layered>
 		XEMMAIX__XADE__SURFACE__ONS
 		v_on_measure = [&](auto& a_width, auto& a_height)
 		{
-			if (auto& on = t_object::f_of(this)->f_fields()[15]) {
+			if (auto& on = t_object::f_of(this)->f_fields()[19]) {
 				auto size = on(a_width, a_height);
 				auto width = size.f_get_at(0);
 				xemmai::f_check<int32_t>(width, L"width");
@@ -23,9 +23,9 @@ struct t_layered : t_proxy_of<::xade::t_layered>
 				a_height = f_as<int32_t>(height);
 			}
 		};
-		XEMMAIX__XADE__ON(map, (auto a_width, auto a_height), 16, a_width, a_height)
-		XEMMAIX__XADE__ON(unmap, , 17, )
-		XEMMAIX__XADE__ON(closed, , 18, )
+		XEMMAIX__XADE__ON(map, (auto a_width, auto a_height), 20, a_width, a_height)
+		XEMMAIX__XADE__ON(unmap, , 21, )
+		XEMMAIX__XADE__ON(closed, , 22, )
 	}
 };
 

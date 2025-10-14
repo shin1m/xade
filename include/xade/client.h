@@ -24,6 +24,7 @@ class t_surface;
 class t_cursor;
 class t_input;
 class t_data_offer;
+class t_drag_offer;
 class t_data_source;
 
 class t_xkb
@@ -88,8 +89,10 @@ public:
 class t_client
 {
 	friend t_client& f_client();
+	friend class t_surface;
 	friend class t_frame;
 	friend class t_input;
+	friend class t_drag_offer;
 	friend class t_data_source;
 
 	static wl_registry_listener v_registry_listener;
@@ -124,7 +127,7 @@ class t_client
 	t_surface* v_keyboard_focus = nullptr;
 	t_owner<zwp_text_input_manager_v3*, zwp_text_input_manager_v3_destroy> v_text_input_manager;
 	t_surface* v_input_focus = nullptr;
-	std::unique_ptr<t_data_offer> v_drag;
+	std::unique_ptr<t_drag_offer> v_drag;
 	std::unique_ptr<t_data_offer> v_selection;
 	std::set<t_data_source*> v_data_sources;
 
@@ -184,6 +187,10 @@ public:
 		return v_input_focus;
 	}
 	std::shared_ptr<t_input> f_new_input();
+	t_drag_offer* f_drag() const
+	{
+		return v_drag.get();
+	}
 	t_data_offer* f_selection() const
 	{
 		return v_selection.get();
@@ -224,6 +231,10 @@ public:
 	std::function<void()> v_on_input_enable;
 	std::function<void()> v_on_input_disable;
 	std::function<void()> v_on_input_done;
+	std::function<void()> v_on_drag_enter;
+	std::function<void()> v_on_drag_leave;
+	std::function<void()> v_on_drag_motion;
+	std::function<void()> v_on_drag_drop;
 
 	t_surface(bool a_depth);
 	~t_surface();
@@ -257,6 +268,7 @@ public:
 		return v_input;
 	}
 	void f_input__(const std::shared_ptr<t_input>& a_input);
+	void f_start_drag(std::unique_ptr<t_data_source>&& a_source, t_surface* a_icon = nullptr);
 };
 
 class t_frame : public t_surface
@@ -407,8 +419,11 @@ class t_data_offer
 {
 	static wl_data_offer_listener v_data_offer_listener;
 
+protected:
 	t_owner<wl_data_offer*, wl_data_offer_destroy> v_offer;
 	std::set<std::string> v_mime_types;
+	uint32_t v_source_actions = WL_DATA_DEVICE_MANAGER_DND_ACTION_NONE;
+	uint32_t v_dnd_action = WL_DATA_DEVICE_MANAGER_DND_ACTION_NONE;
 
 public:
 	t_data_offer(wl_data_offer* a_offer) : v_offer(a_offer)
@@ -438,9 +453,40 @@ public:
 	}
 };
 
+struct t_drag_offer : t_data_offer
+{
+	using t_data_offer::t_data_offer;
+	void f_accept(const char* a_mime_type)
+	{
+		wl_data_offer_accept(v_offer, f_client().v_action_serial, a_mime_type);
+	}
+	uint32_t f_source_actions() const
+	{
+		return v_source_actions;
+	}
+	uint32_t f_dnd_action() const
+	{
+		return v_dnd_action;
+	}
+	void f_set_actions(uint32_t a_dnd_actions, uint32_t a_preferred_action)
+	{
+		return wl_data_offer_set_actions(v_offer, a_dnd_actions, a_preferred_action);
+	}
+	void f_finish()
+	{
+		wl_data_offer_finish(v_offer);
+		f_client().v_drag.reset();
+	}
+	void f_cancel()
+	{
+		f_client().v_drag.reset();
+	}
+};
+
 class t_data_source
 {
 	friend class t_client;
+	friend class t_surface;
 
 	static wl_data_source_listener v_data_source_listener;
 
@@ -448,6 +494,12 @@ class t_data_source
 	std::map<std::string, std::function<std::function<ssize_t(int32_t)>()>> v_offers;
 
 public:
+	std::function<void(const char*)> v_on_target;
+	std::function<void()> v_on_cancelled;
+	std::function<void()> v_on_dnd_drop_performed;
+	std::function<void()> v_on_dnd_finished;
+	std::function<void(uint32_t)> v_on_action;
+
 	t_data_source() : v_source(wl_data_device_manager_create_data_source(f_client().v_data_device_manager))
 	{
 		f_client().v_data_sources.insert(this);
@@ -462,11 +514,20 @@ public:
 		v_offers.emplace(a_mime_type, std::move(a_write));
 		wl_data_source_offer(v_source, a_mime_type);
 	}
+	void f_set_actions(uint32_t a_dnd_actions)
+	{
+		wl_data_source_set_actions(v_source, a_dnd_actions);
+	}
 };
 
 inline void t_client::f_set_selection(std::unique_ptr<t_data_source>&& a_source)
 {
 	wl_data_device_set_selection(v_data_device, a_source ? static_cast<wl_data_source*>(a_source.release()->v_source) : NULL, v_action_serial);
+}
+
+inline void t_surface::f_start_drag(std::unique_ptr<t_data_source>&& a_source, t_surface* a_icon)
+{
+	wl_data_device_start_drag(f_client().v_data_device, a_source ? static_cast<wl_data_source*>(a_source.release()->v_source) : NULL, v_surface, a_icon ? static_cast<wl_surface*>(*a_icon) : NULL, f_client().v_action_serial);
 }
 
 #pragma GCC diagnostic pop
