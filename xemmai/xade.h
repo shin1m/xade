@@ -23,9 +23,11 @@ protected:
 	{
 		v_previous->v_next = v_next->v_previous = this;
 	}
-
-public:
-	virtual void f_dispose();
+	~t_entry()
+	{
+		v_previous->v_next = v_next;
+		v_next->v_previous = v_previous;
+	}
 };
 
 class t_session : public t_entry, public t_client
@@ -52,7 +54,7 @@ public:
 	~t_session();
 };
 
-class t_proxy : t_entry
+class t_proxy : public t_entry
 {
 protected:
 	t_session* v_session = static_cast<t_session*>(v_previous);
@@ -81,7 +83,7 @@ struct t_proxy_of : t_proxy, T
 	}
 	virtual void f_dispose()
 	{
-		T::~T();
+		this->~T();
 		t_proxy::f_dispose();
 	}
 };

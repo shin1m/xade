@@ -5,12 +5,6 @@
 namespace xemmaix::xade
 {
 
-void t_entry::f_dispose()
-{
-	v_previous->v_next = v_next;
-	v_next->v_previous = v_previous;
-}
-
 t_session::t_session() : t_client([&](auto a_this, auto a_name, auto a_interface, auto a_version)
 {
 	if (std::strcmp(a_interface, zwlr_layer_shell_v1_interface.name) == 0) v_layer = static_cast<zwlr_layer_shell_v1*>(wl_registry_bind(a_this, a_name, &zwlr_layer_shell_v1_interface, std::min<uint32_t>(a_version, zwlr_layer_shell_v1_interface.version)));
@@ -29,7 +23,7 @@ t_session::t_session() : t_client([&](auto a_this, auto a_name, auto a_interface
 
 t_session::~t_session()
 {
-	while (v_next != this) v_next->f_dispose();
+	while (v_next != this) static_cast<t_proxy*>(v_next)->f_dispose();
 	if (v_layer) {
 		zwlr_layer_shell_v1_destroy(v_layer);
 		v_layer = NULL;
@@ -39,8 +33,8 @@ t_session::~t_session()
 
 void t_proxy::f_dispose()
 {
-	t_entry::f_dispose();
 	v_object = nullptr;
+	this->~t_entry();
 }
 
 void t_library::f_scan(t_scan a_scan)
