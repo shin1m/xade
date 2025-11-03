@@ -395,6 +395,7 @@ struct t_keyboard
 	wl_list v_link;
 	t_server* v_server;
 	wlr_keyboard* v_keyboard;
+	xkb_keysym_t v_grabbing = XKB_KEY_NoSymbol;
 	wl_listener v_modifiers;
 	wl_listener v_key;
 	wl_listener v_destroy;
@@ -871,8 +872,12 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 		auto server = self->v_server;
 		auto seat = server->v_seat;
 		auto event = static_cast<wlr_keyboard_key_event*>(a_data);
+		if (self->v_grabbing != XKB_KEY_NoSymbol) {
+			if (event->state == WL_KEYBOARD_KEY_STATE_RELEASED && xkb_state_key_get_one_sym(self->v_keyboard->xkb_state, event->keycode + 8) == self->v_grabbing) self->v_grabbing = XKB_KEY_NoSymbol;
+			return;
+		}
 		if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-			auto sym = xkb_state_key_get_one_sym(self->v_keyboard->xkb_state, event->keycode + 8);
+			self->v_grabbing = xkb_state_key_get_one_sym(self->v_keyboard->xkb_state, event->keycode + 8);
 			if (wlr_keyboard_get_modifiers(self->v_keyboard) & WLR_MODIFIER_LOGO) {
 				auto find = [&](wl_list* a_link, wl_list* wl_list::* a_sibling) -> t_toplevel*
 				{
@@ -902,7 +907,7 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 						a_link = &a_tree->children;
 					}
 				};
-				switch (sym) {
+				switch (self->v_grabbing) {
 				case XKB_KEY_Escape:
 					wl_display_terminate(server->v_display);
 					return;
@@ -959,7 +964,7 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 					return;
 				}
 			}
-			if (sym == XKB_KEY_Zenkaku_Hankaku || sym == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
+			if (self->v_grabbing == XKB_KEY_Zenkaku_Hankaku || self->v_grabbing == XKB_KEY_Eisu_toggle) if (auto p = server->v_input_method) if (auto q = server->v_focused_text_input) {
 				p->v_on ^= true;
 				if (p->v_on) {
 					wlr_input_method_v2_send_activate(*p);
@@ -971,6 +976,7 @@ t_keyboard::t_keyboard(t_server* a_server, wlr_input_device* a_device) : v_serve
 				return;
 			}
 		}
+		self->v_grabbing = XKB_KEY_NoSymbol;
 		if (auto p = server->f_focused_node()) if (!p->enabled) return;
 		if (auto p = server->v_input_method) if (auto q = p->v_input_method->keyboard_grab) {
 			wlr_input_method_keyboard_grab_v2_set_keyboard(q, self->v_keyboard);
