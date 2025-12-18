@@ -20,8 +20,7 @@ v_part_cursors{
 },
 v_cursor_text("text"), v_cursor_arrow("default")
 {
-	SkUnichar cs[] = {L'\ue5d2', L'\ue931', L'\ue930', L'\ue5d0', L'\ue5cd'};
-	v_font.unicharsToGlyphs(cs, 5, v_glyphs);
+	v_font.unicharsToGlyphs({L'\ue5d2', L'\ue931', L'\ue930', L'\ue5d0', L'\ue5cd'}, v_glyphs);
 }
 
 void t_theme::f_draw(SkCanvas& a_canvas, SkGlyphID a_glyph, int a_x, int a_y, size_t a_state) const
@@ -31,9 +30,8 @@ void t_theme::f_draw(SkCanvas& a_canvas, SkGlyphID a_glyph, int a_x, int a_y, si
 		paint.setColor(a_state == 1 ? v_color_hovered : v_color_pressed);
 		a_canvas.drawIRect(SkIRect::MakePtSize({a_x, a_y}, v_unit), paint);
 	}
-	SkPoint point{};
 	paint.setColor(v_color_foreground);
-	a_canvas.drawGlyphs(1, &a_glyph, &point, {static_cast<float>(a_x), static_cast<float>(a_y + v_unit.fHeight)}, v_font, paint);
+	a_canvas.drawGlyphs({a_glyph}, {{}}, {static_cast<float>(a_x), static_cast<float>(a_y + v_unit.fHeight)}, v_font, paint);
 }
 
 t_decoration::t_part t_decoration::f_part(t_frame& a_frame) const

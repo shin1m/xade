@@ -196,8 +196,8 @@ int t_window::f_draw_row(SkCanvas& a_canvas, int a_x, int a_y, const t_row* a_ro
 		paint.setColor(colors[a.v_background]);
 		a_canvas.drawIRect(SkIRect::MakeXYWH(a_x, a_y, w, v_unit.fHeight), paint);
 		paint.setColor(colors[a.v_foreground]);
-		v_font.unicharsToGlyphs(v_cs, n, v_glyphs);
-		a_canvas.drawGlyphs(n, v_glyphs, v_positions, {static_cast<float>(a_x), y}, a.v_bold ? v_bold : v_font, paint);
+		v_font.unicharsToGlyphs({v_cs, n}, {v_glyphs, n});
+		a_canvas.drawGlyphs({v_glyphs, n}, {v_positions, n}, {static_cast<float>(a_x), y}, a.v_bold ? v_bold : v_font, paint);
 		if (a.v_underlined) a_canvas.drawIRect(SkIRect::MakeXYWH(a_x, u, w, 1), paint);
 		a_x += w;
 	}
@@ -265,9 +265,7 @@ void t_window::f_draw_content(SkCanvas& a_canvas)
 		if (&v_host.v_surface == f_client().f_keyboard_focus()) {
 			a_canvas.drawIRect(SkIRect::MakeXYWH(x, y, width, uh), paint);
 			paint.setColor(colors[a.v_background]);
-			auto glyph = v_font.unicharToGlyph(c);
-			SkPoint point{};
-			a_canvas.drawGlyphs(1, &glyph, &point, {static_cast<float>(x), y - v_metrics.fAscent}, a.v_bold ? v_bold : v_font, paint);
+			a_canvas.drawGlyphs({v_font.unicharToGlyph(c)}, {{}}, {static_cast<float>(x), y - v_metrics.fAscent}, a.v_bold ? v_bold : v_font, paint);
 			if (a.v_underlined) a_canvas.drawIRect(SkIRect::MakeXYWH(x, y + uh - 1, width, 1), paint);
 		} else {
 			paint.setStyle(SkPaint::kStroke_Style);

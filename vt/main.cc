@@ -9,6 +9,7 @@
 #include <xade/layered.h>
 #include <include/core/SkFontMgr.h>
 #include <include/ports/SkFontMgr_fontconfig.h>
+#include <include/ports/SkFontScanner_FreeType.h>
 
 namespace
 {
@@ -98,7 +99,7 @@ int f_main(int argc, char* argv[], int a_master)
 #endif
 	{
 		using namespace std::literals;
-		auto fm = SkFontMgr_New_FontConfig(nullptr);
+		auto fm = SkFontMgr_New_FontConfig(nullptr, SkFontScanner_Make_FreeType());
 		auto typeface = fm->matchFamilyStyle(nullptr, {});
 		auto self = []
 		{
@@ -117,10 +118,7 @@ int f_main(int argc, char* argv[], int a_master)
 		});
 		t_theme theme({symbols, 20}, 8);
 		SkGlyphID bar_glyphs[2];
-		{
-			SkUnichar cs[] = {L'\ue5c7', L'\ue5c5'};
-			theme.v_font.unicharsToGlyphs(cs, 2, bar_glyphs);
-		}
+		theme.v_font.unicharsToGlyphs({L'\ue5c7', L'\ue5c5'}, bar_glyphs);
 		size_t log = 192;
 		size_t columns = 80;
 		size_t rows = 24;

@@ -10,6 +10,7 @@
 #include <include/core/SkFontMetrics.h>
 #include <include/core/SkFontMgr.h>
 #include <include/ports/SkFontMgr_fontconfig.h>
+#include <include/ports/SkFontScanner_FreeType.h>
 
 namespace
 {
@@ -274,7 +275,7 @@ int main(int argc, char* argv[])
 		closedir(dp);
 	}
 	std::sort(publics.begin(), publics.end());
-	auto fm = SkFontMgr_New_FontConfig(nullptr);
+	auto fm = SkFontMgr_New_FontConfig(nullptr, SkFontScanner_Make_FreeType());
 	auto typeface = fm->matchFamilyStyle(nullptr, {});
 	suisha::t_loop loop;
 	zwp_input_method_manager_v2* manager = NULL;
