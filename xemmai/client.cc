@@ -229,6 +229,26 @@ void t_type_of<xemmaix::xade::t_frame>::f_define(t_library* a_library)
 		t_member<void(xade::t_frame::*)(xdg_toplevel_resize_edge), &t_frame::f_resize>(),
 		t_member<void(xade::t_frame::*)(int32_t, int32_t), &t_frame::f_resize>()
 	)
+	(L"set_maximized"sv, t_member<void(*)(xade::t_frame&), [](auto a_this)
+	{
+		xdg_toplevel_set_maximized(a_this);
+	}>())
+	(L"unset_maximized"sv, t_member<void(*)(xade::t_frame&), [](auto a_this)
+	{
+		xdg_toplevel_unset_maximized(a_this);
+	}>())
+	(L"set_fullscreen"sv, t_member<void(*)(xade::t_frame&), [](auto a_this)
+	{
+		xdg_toplevel_set_fullscreen(a_this, NULL);
+	}>())
+	(L"unset_fullscreen"sv, t_member<void(*)(xade::t_frame&), [](auto a_this)
+	{
+		xdg_toplevel_unset_fullscreen(a_this);
+	}>())
+	(L"set_minimized"sv, t_member<void(*)(xade::t_frame&), [](auto a_this)
+	{
+		xdg_toplevel_set_minimized(a_this);
+	}>())
 	.f_derive<t_frame, xemmaix::xade::t_surface>();
 }
 
