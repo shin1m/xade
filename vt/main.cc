@@ -100,7 +100,7 @@ int f_main(int argc, char* argv[], int a_master)
 	{
 		using namespace std::literals;
 		auto fm = SkFontMgr_New_FontConfig(nullptr, SkFontScanner_Make_FreeType());
-		auto typeface = fm->matchFamilyStyle(nullptr, {});
+		auto typeface = fm->matchFamilyStyle("monospace", {});
 		auto self = []
 		{
 			char cs[PATH_MAX];
