@@ -89,11 +89,10 @@ public:
 		wl_region_destroy(region);
 		v_popup = zwp_input_method_v2_get_input_popup_surface(v_input, v_surface);
 		if (!v_popup) throw std::runtime_error("input popup");
-		int size = std::ceil(v_font.getMetrics(&v_metrics));
-		v_surface.f_create(size, size);
+		v_surface.f_create(1, 1);
 		v_surface.f_make_current();
 		v_sk_context = skia::f_new_direct_context();
-		v_surface.v_on_frame = [&](auto a_time)
+		v_surface.v_on_frame = [&, unit = std::ceil(v_font.getMetrics(&v_metrics))](auto a_time)
 		{
 			std::vector rows{1, f_status()};
 			size_t current = -1;
@@ -119,7 +118,7 @@ public:
 				int w = std::ceil(v_font.measureText(s.c_str(), s.size() * sizeof(wchar_t), SkTextEncoding::kUTF32, nullptr));
 				if (w > width) width = w;
 			}
-			int height = std::ceil(v_font.getSize() * rows.size());
+			int height = std::ceil(unit * rows.size());
 			v_surface.f_make_current();
 			int width0;
 			int height0;
@@ -138,15 +137,16 @@ public:
 			for (size_t i = 0; auto& s : rows) {
 				paint.setColor(SkColorSetARGB(255, 0, 0, 0));
 				if (i++ == current) {
-					canvas.drawIRect(SkIRect::MakeXYWH(0, y + v_metrics.fAscent, width, v_font.getSize()), paint);
+					canvas.drawIRect(SkIRect::MakeXYWH(0, y + v_metrics.fAscent, width, unit), paint);
 					paint.setColor(SkColorSetARGB(255, 255, 255, 255));
 				}
 				canvas.drawSimpleText(s.c_str(), s.size() * sizeof(wchar_t), SkTextEncoding::kUTF32, 0.0, y, v_font, paint);
-				y += v_font.getSize();
+				y += unit;
 			}
 			v_sk_context->flushAndSubmit(v_sk_surface.get());
 			v_surface.f_swap_buffers();
 		};
+		v_surface.f_swap_buffers();
 	}
 };
 
