@@ -394,12 +394,13 @@ std::fprintf(stderr, "Device Status Report unknown parameter: %d\n", p);
 	}
 	void f_put(wchar_t a_c)
 	{
-		if (v_cursor_x >= f_width()) {
-			if (!v_mode_wraparound) return;
+		int n = v_host.f_width(a_c);
+		if (v_mode_wraparound && v_cursor_x + n > f_width()) {
 			t_buffer<T_host>::f_wrap(v_cursor_y);
 			f_next_line();
 		}
-		v_cursor_x += t_buffer<T_host>::f_put(v_cursor_x, v_cursor_y, {a_c, v_attribute}, v_mode_insert);
+		t_buffer<T_host>::f_put(v_cursor_x, v_cursor_y, {a_c, v_attribute}, n, v_mode_insert);
+		v_cursor_x += n;
 	}
 	void f_control_character(wchar_t a_c)
 	{
@@ -594,7 +595,7 @@ std::fprintf(stderr, "Unknown escape sequence: %c\n", a_c);
 		case L'8':
 			for (unsigned i = 0; i < f_height(); ++i)
 				for (unsigned j = 0; j < f_width(); ++j)
-					t_buffer<T_host>::f_put(j, i, {L'E', v_attribute}, false);
+					t_buffer<T_host>::f_put(j, i, {L'E', v_attribute}, v_host.f_width(L'E'), false);
 			break;
 		default:
 std::fprintf(stderr, "Unknown escape sequence: # %c\n", a_c);

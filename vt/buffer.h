@@ -192,31 +192,28 @@ protected:
 		}
 		v_host.f_invalidate(a_y, 1);
 	}
-	unsigned f_put(unsigned a_x, unsigned a_y, const t_cell& a_cell, bool a_shift)
+	void f_put(unsigned a_x, unsigned a_y, const t_cell& a_cell, unsigned a_width, bool a_shift)
 	{
-		if (a_x >= v_width) return 0;
-		int n = v_host.f_width(a_cell.v_c);
-		if (n <= 0) return 0;
+		if (a_width <= 0 || a_x >= v_width) return;
 		t_row* row = v_current->v_rows[a_y];
 		row->f_expand(a_x);
 		row->f_split(a_x);
 		t_cell* p = row->v_cells;
-		if (a_x + n > v_width) {
+		if (a_x + a_width > v_width) {
 			std::fill(p + a_x, p + v_width, t_cell{L' ', a_cell.v_a});
 			row->v_size = v_width;
 		} else {
 			if (a_shift)
-				row->f_insert(a_x, n, v_width);
-			else if (a_x + n < row->v_size)
-				row->f_split(a_x + n);
+				row->f_insert(a_x, a_width, v_width);
+			else if (a_x + a_width < row->v_size)
+				row->f_split(a_x + a_width);
 			else
-				row->v_size = a_x + n;
+				row->v_size = a_x + a_width;
 			p += a_x;
 			*p = a_cell;
-			std::fill(p + 1, p + n, t_cell{L'\0', a_cell.v_a});
+			std::fill(p + 1, p + a_width, t_cell{L'\0', a_cell.v_a});
 		}
 		v_host.f_invalidate(a_y, 1);
-		return n;
 	}
 	void f_erase(unsigned a_x, unsigned a_y, unsigned a_n, bool a_shift)
 	{
