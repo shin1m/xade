@@ -42,6 +42,8 @@ class t_window
 	SkColor v_colors[80];
 	SkFont v_font;
 	SkFont v_bold;
+	SkFont v_emoji;
+	SkFont v_emoji_bold;
 	SkFontMetrics v_metrics;
 	SkISize v_unit;
 	size_t v_width;
@@ -127,7 +129,7 @@ public:
 	};
 	t_host& v_host;
 
-	t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const SkFont& a_font, t_host& a_host);
+	t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const sk_sp<SkTypeface>& a_typeface, const sk_sp<SkTypeface>& a_emoji, float a_size, t_host& a_host);
 	~t_window();
 };
 

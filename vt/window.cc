@@ -181,8 +181,7 @@ int t_window::f_draw_row(SkCanvas& a_canvas, int a_x, int a_y, const t_row* a_ro
 		unsigned w = 0;
 		auto a = cells[i].v_a;
 		do {
-			wchar_t c = cells[i++].v_c;
-			if (c != L'\0') {
+			if (auto c = cells[i++].v_c) {
 				v_cs[n] = c;
 				v_positions[n].fX = w;
 				++n;
@@ -196,6 +195,21 @@ int t_window::f_draw_row(SkCanvas& a_canvas, int a_x, int a_y, const t_row* a_ro
 		paint.setColor(colors[a.v_background]);
 		a_canvas.drawIRect(SkIRect::MakeXYWH(a_x, a_y, w, v_unit.fHeight), paint);
 		paint.setColor(colors[a.v_foreground]);
+		v_emoji.unicharsToGlyphs({v_cs, n}, {v_glyphs, n});
+		auto emoji = false;
+		for (size_t i = 0; i < n; ++i) {
+			if (!v_glyphs[i]) continue;
+			if (v_cs[i] < 0x100)
+				v_glyphs[i] = 0;
+			else
+				emoji = true;
+		}
+		if (emoji) {
+			paint.setBlendMode(SkBlendMode::kSrcOver);
+			a_canvas.drawGlyphs({v_glyphs, n}, {v_positions, n}, {static_cast<float>(a_x), y}, a.v_bold ? v_emoji_bold : v_emoji, paint);
+			paint.setBlendMode(SkBlendMode::kSrc);
+			for (size_t i = 0; i < n; ++i) if (v_glyphs[i]) v_cs[i] = L' ';
+		}
 		v_font.unicharsToGlyphs({v_cs, n}, {v_glyphs, n});
 		a_canvas.drawGlyphs({v_glyphs, n}, {v_positions, n}, {static_cast<float>(a_x), y}, a.v_bold ? v_bold : v_font, paint);
 		if (a.v_underlined) a_canvas.drawIRect(SkIRect::MakeXYWH(a_x, u, w, 1), paint);
@@ -265,7 +279,13 @@ void t_window::f_draw_content(SkCanvas& a_canvas)
 		if (&v_host.v_surface == f_client().f_keyboard_focus()) {
 			a_canvas.drawIRect(SkIRect::MakeXYWH(x, y, width, uh), paint);
 			paint.setColor(colors[a.v_background]);
-			a_canvas.drawGlyphs({v_font.unicharToGlyph(c)}, {{}}, {static_cast<float>(x), y - v_metrics.fAscent}, a.v_bold ? v_bold : v_font, paint);
+			if (auto glyph = c < 0x100 ? SkGlyphID{} : v_emoji.unicharToGlyph(c)) {
+				paint.setBlendMode(SkBlendMode::kSrcOver);
+				a_canvas.drawGlyphs({glyph}, {{}}, {static_cast<float>(x), y - v_metrics.fAscent}, a.v_bold ? v_emoji_bold : v_emoji, paint);
+				paint.setBlendMode(SkBlendMode::kSrc);
+			} else {
+				a_canvas.drawGlyphs({v_font.unicharToGlyph(c)}, {{}}, {static_cast<float>(x), y - v_metrics.fAscent}, a.v_bold ? v_bold : v_font, paint);
+			}
 			if (a.v_underlined) a_canvas.drawIRect(SkIRect::MakeXYWH(x, y + uh - 1, width, 1), paint);
 		} else {
 			paint.setStyle(SkPaint::kStroke_Style);
@@ -449,7 +469,7 @@ void t_window::f_select_to()
 	f_invalidate_selection();
 }
 
-t_window::t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const SkFont& a_font, t_host& a_host) :
+t_window::t_window(unsigned a_log, unsigned a_width, unsigned a_height, int a_master, const sk_sp<SkTypeface>& a_typeface, const sk_sp<SkTypeface>& a_emoji, float a_size, t_host& a_host) :
 v_buffer(*this, a_log, a_width, a_height), v_master(a_master),
 v_colors{
 	SkColorSetARGB(255, 255, 255, 255),
@@ -540,13 +560,15 @@ v_colors{
 	SkColorSetARGB(255, 31, 127, 127),
 	SkColorSetARGB(255, 127, 127, 127)
 },
-v_font(a_font), v_bold(a_font.makeWithSize(a_font.getSize())),
+v_font(a_typeface, a_size), v_bold(a_typeface, a_size),
+v_emoji(a_emoji, a_size), v_emoji_bold(a_emoji, a_size),
 v_unit(SkISize::Make(std::ceil(v_font.measureText(L"M", sizeof(wchar_t), SkTextEncoding::kUTF32, nullptr)), std::ceil(v_font.getMetrics(&v_metrics)))),
 v_host(a_host),
 v_cs(new SkUnichar[a_width]), v_glyphs(new SkGlyphID[a_width]), v_positions(new SkPoint[a_width])
 {
 	std::fill_n(v_positions, a_width, SkPoint::Make(0.0f, 0.0f));
 	v_bold.setEmbolden(true);
+	v_emoji_bold.setEmbolden(true);
 	v_host.v_on_measure = [&](auto& a_width, auto& a_height)
 	{
 		auto frame = v_host.v_measure_frame();

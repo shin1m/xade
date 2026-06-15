@@ -101,6 +101,7 @@ int f_main(int argc, char* argv[], int a_master)
 		using namespace std::literals;
 		auto fm = SkFontMgr_New_FontConfig(nullptr, SkFontScanner_Make_FreeType());
 		auto typeface = fm->matchFamilyStyle("monospace", {});
+		auto emoji = fm->matchFamilyStyle("emoji", {});
 		auto self = []
 		{
 			char cs[PATH_MAX];
@@ -146,7 +147,7 @@ int f_main(int argc, char* argv[], int a_master)
 				theme.v_cursor_text,
 				theme.v_cursor_arrow
 			};
-			t_window window(log, columns, rows, a_master, {typeface, 14}, host);
+			t_window window(log, columns, rows, a_master, typeface, emoji, 14, host);
 			prepare();
 			loop.f_run();
 		};
