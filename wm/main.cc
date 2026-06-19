@@ -1065,7 +1065,7 @@ t_input_method::t_input_method(t_server* a_server, wlr_input_method_v2* a_input_
 			auto& preedit = state.preedit;
 			wlr_text_input_v3_send_preedit_string(*p, preedit.text, preedit.cursor_begin, preedit.cursor_end);
 			wlr_text_input_v3_send_commit_string(*p, state.commit_text);
-			wlr_text_input_v3_send_delete_surrounding_text(*p, ds.before_length, ds.after_length);
+			if (ds.before_length || ds.after_length) wlr_text_input_v3_send_delete_surrounding_text(*p, ds.before_length, ds.after_length);
 			wlr_text_input_v3_send_done(*p);
 		}
 	};
